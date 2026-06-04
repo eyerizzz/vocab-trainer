@@ -1,0 +1,37 @@
+[
+  {
+    "id": "word_mpyzan2o_73d3b877",
+    "english": "robust",
+    "chinese": "稳健的",
+    "partOfSpeech": "adjective",
+    "createdAt": "2026-06-04T04:11:41.520Z"
+  },
+  {
+    "id": "word_mpz0ejjb_44887fe4",
+    "english": "alarming",
+    "chinese": "令人担忧的，令人恐惧的",
+    "partOfSpeech": "adjective",
+    "createdAt": "2026-06-04T04:42:43.175Z"
+  },
+  {
+    "id": "word_mpz0ejjc_09419f62",
+    "english": "alarming",
+    "chinese": "使不安，使恐慌；给（门等）安装警报器（alarm 的现在分词）",
+    "partOfSpeech": "verb",
+    "createdAt": "2026-06-04T04:42:43.175Z"
+  },
+  {
+    "id": "word_mpz11d5q_ac667db7",
+    "english": "endurance",
+    "chinese": "持久力，忍耐力；耐久性，耐用度",
+    "partOfSpeech": "noun",
+    "createdAt": "2026-06-04T05:00:27.998Z"
+  },
+  {
+    "id": "word_mpz11vfi_45152c1b",
+    "english": "chronic",
+    "chinese": "（疾病）慢性的，长期的；（问题）一直有的，反复出现的；难以根除的，积习难改的；糟透的，拙劣的",
+    "partOfSpeech": "adjective",
+    "createdAt": "2026-06-04T05:00:51.678Z"
+  }
+]
