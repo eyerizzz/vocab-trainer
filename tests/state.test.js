@@ -4,15 +4,38 @@ import {
   createQuizState,
   getAccuracy,
   recordAnswer,
-  resetQuizProgress
+  recordWrongQuestion,
+  resetQuizProgress,
+  startWrongQuestionReview
 } from '../src/client/state.js';
 
 test('starts quiz progress at zero accuracy', () => {
   const quizState = createQuizState();
 
+  assert.equal(quizState.mode, 'zh-to-en');
+  assert.equal(quizState.started, false);
   assert.equal(quizState.total, 0);
   assert.equal(quizState.correct, 0);
   assert.equal(getAccuracy(quizState), 0);
+});
+
+test('records wrong questions once and starts review queue', () => {
+  const quizState = createQuizState();
+  const question = {
+    wordId: 'word_1',
+    meaningId: 'meaning_1',
+    mode: 'zh-to-en',
+    prompt: '苹果'
+  };
+
+  recordWrongQuestion(quizState, { question, submittedAnswer: 'aple' });
+  recordWrongQuestion(quizState, { question, submittedAnswer: 'applee' });
+  startWrongQuestionReview(quizState);
+
+  assert.equal(quizState.wrongQuestions.length, 1);
+  assert.equal(quizState.reviewMode, true);
+  assert.equal(quizState.started, true);
+  assert.deepEqual(quizState.reviewQueue, [question]);
 });
 
 test('records correct and incorrect answers for accuracy', () => {
@@ -35,6 +58,7 @@ test('resets quiz progress without changing selected controls', () => {
     days: 30,
     currentQuestion: { wordId: 'word_1' },
     answeredCurrent: true,
+    started: true,
     total: 4,
     correct: 3
   };
@@ -46,6 +70,7 @@ test('resets quiz progress without changing selected controls', () => {
   assert.equal(quizState.days, 30);
   assert.equal(quizState.currentQuestion, null);
   assert.equal(quizState.answeredCurrent, false);
+  assert.equal(quizState.started, false);
   assert.equal(quizState.total, 0);
   assert.equal(quizState.correct, 0);
   assert.equal(getAccuracy(quizState), 0);

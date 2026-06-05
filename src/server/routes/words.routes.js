@@ -1,5 +1,5 @@
 import { lookupWordDefinitions } from '../services/dictionaryLookup.js';
-import { addWord, addWords, getWords } from '../services/wordStore.js';
+import { addWord, addWords, deleteWord, getWords, updateWord } from '../services/wordStore.js';
 
 async function readJsonBody(request) {
   let body = '';
@@ -19,6 +19,8 @@ function sendJson(response, statusCode, payload) {
 }
 
 export async function handleWordsRoute(request, response, url) {
+  const wordIdMatch = url.pathname.match(/^\/api\/words\/([^/]+)$/);
+
   if (url.pathname === '/api/words/lookup' && request.method === 'GET') {
     const english = url.searchParams.get('english') || '';
     const result = await lookupWordDefinitions(english);
@@ -29,9 +31,24 @@ export async function handleWordsRoute(request, response, url) {
 
   if (url.pathname === '/api/words/batch' && request.method === 'POST') {
     const input = await readJsonBody(request);
-    const words = await addWords(input.words);
+    const result = await addWords(input.words);
 
-    sendJson(response, 201, { words });
+    sendJson(response, 201, result);
+    return;
+  }
+
+  if (wordIdMatch && request.method === 'PUT') {
+    const input = await readJsonBody(request);
+    const word = await updateWord(decodeURIComponent(wordIdMatch[1]), input);
+
+    sendJson(response, 200, { word });
+    return;
+  }
+
+  if (wordIdMatch && request.method === 'DELETE') {
+    const result = await deleteWord(decodeURIComponent(wordIdMatch[1]));
+
+    sendJson(response, 200, result);
     return;
   }
 
@@ -48,7 +65,7 @@ export async function handleWordsRoute(request, response, url) {
   if (request.method === 'POST') {
     const input = await readJsonBody(request);
     const word = await addWord(input);
-    sendJson(response, 201, { word });
+    sendJson(response, 201, { word, savedCount: 1 });
     return;
   }
 

@@ -32,6 +32,47 @@ function cleanText(value) {
     .trim();
 }
 
+function cleanDefinitionFragment(value) {
+  return cleanText(value)
+    .replace(/（[^）]*(?:现在分词|过去分词)[^）]*）/g, '')
+    .replace(/\([^)]*(?:present participle|past participle|现在分词|过去分词)[^)]*\)/gi, '')
+    .replace(/（[^）]*）/g, '')
+    .replace(/\([^)]*\)/g, '')
+    .replace(/^尤指/, '')
+    .replace(/^常指/, '')
+    .replace(/^比喻/, '')
+    .replace(/^口语/, '')
+    .trim();
+}
+
+export function compactChineseDefinition(value, maxItems = 3) {
+  const fragments = cleanText(value)
+    .split(/[；;，,、/]/)
+    .map(cleanDefinitionFragment)
+    .filter((fragment) => (
+      fragment &&
+      /[\u4e00-\u9fff]/.test(fragment) &&
+      !/(?:现在分词|过去分词|present participle|past participle)/i.test(fragment)
+    ));
+  const seen = new Set();
+  const compact = [];
+
+  for (const fragment of fragments) {
+    if (seen.has(fragment)) {
+      continue;
+    }
+
+    seen.add(fragment);
+    compact.push(fragment);
+
+    if (compact.length >= maxItems) {
+      break;
+    }
+  }
+
+  return compact.join('；');
+}
+
 function assertEnglishWord(value) {
   const english = cleanText(value).toLowerCase();
 
@@ -64,7 +105,7 @@ function splitDefinitionLine(line) {
 
   return {
     partOfSpeech: normalizePartOfSpeech(match[1]),
-    chinese: cleanText(match[2])
+    chinese: compactChineseDefinition(match[2]) || cleanText(match[2])
   };
 }
 
@@ -104,28 +145,32 @@ function parseExplainText(explain) {
 }
 
 function dedupeCandidates(candidates) {
-  const seen = new Set();
-  const deduped = [];
+  const byPartOfSpeech = new Map();
 
   for (const candidate of candidates) {
     const english = cleanText(candidate.english).toLowerCase();
-    const chinese = cleanText(candidate.chinese);
+    const chinese = compactChineseDefinition(candidate.chinese) || cleanText(candidate.chinese);
     const partOfSpeech = normalizePartOfSpeech(candidate.partOfSpeech);
-    const key = `${english}|${partOfSpeech}|${chinese}`;
+    const key = `${english}|${partOfSpeech}`;
 
-    if (!english || !chinese || seen.has(key)) {
+    if (!english || !chinese) {
       continue;
     }
 
-    seen.add(key);
-    deduped.push({ english, chinese, partOfSpeech });
+    const existing = byPartOfSpeech.get(key);
 
-    if (deduped.length >= maxCandidates) {
+    if (existing) {
+      existing.chinese = compactChineseDefinition(`${existing.chinese}；${chinese}`);
+    } else {
+      byPartOfSpeech.set(key, { english, chinese, partOfSpeech });
+    }
+
+    if (byPartOfSpeech.size >= maxCandidates) {
       break;
     }
   }
 
-  return deduped;
+  return [...byPartOfSpeech.values()];
 }
 
 export function parseYoudaoLookup(payload, english) {

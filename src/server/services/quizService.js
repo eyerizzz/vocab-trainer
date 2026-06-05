@@ -40,6 +40,53 @@ function getRandomIndex(length, rng) {
   return Math.floor(boundedValue * length);
 }
 
+function getRandomValue(rng) {
+  const randomValue = Number(rng());
+  return Number.isFinite(randomValue)
+    ? Math.min(Math.max(randomValue, 0), 1 - Number.EPSILON)
+    : 0;
+}
+
+function getMeanings(word) {
+  if (Array.isArray(word.meanings)) {
+    return word.meanings;
+  }
+
+  return [{
+    id: word.meaningId || `${word.id}_meaning`,
+    partOfSpeech: word.partOfSpeech,
+    chinese: word.chinese
+  }];
+}
+
+function getMeaningWeight(meaning) {
+  const errorCount = Number(meaning.errorCount || 0);
+  return 1 + Math.min(Math.max(errorCount, 0), 10);
+}
+
+function createQuestionCandidates(words) {
+  return words.flatMap((word) => getMeanings(word).map((meaning) => ({
+    word,
+    meaning,
+    weight: getMeaningWeight(meaning)
+  })));
+}
+
+function pickWeightedCandidate(candidates, rng) {
+  const totalWeight = candidates.reduce((sum, candidate) => sum + candidate.weight, 0);
+  let target = getRandomValue(rng) * totalWeight;
+
+  for (const candidate of candidates) {
+    target -= candidate.weight;
+
+    if (target < 0) {
+      return candidate;
+    }
+  }
+
+  return candidates[candidates.length - 1];
+}
+
 export function getRangeStart(range = 'all', days, now = new Date()) {
   assertRange(range);
 
@@ -72,18 +119,21 @@ export function filterWordsByRange(words, options = {}, now = new Date()) {
 
 export function buildQuestion(word, mode) {
   assertMode(mode);
+  const meaning = getMeanings(word)[0];
 
   return {
     wordId: word.id,
+    meaningId: meaning.id,
+    english: word.english,
     mode,
-    prompt: mode === 'en-to-zh' ? word.english : word.chinese,
+    prompt: mode === 'en-to-zh' ? word.english : meaning.chinese,
     answerLanguage: mode === 'en-to-zh' ? '中文释义' : '英文单词',
-    partOfSpeech: word.partOfSpeech
+    partOfSpeech: meaning.partOfSpeech
   };
 }
 
 export function pickRandomQuestion(words, options = {}, rng = Math.random, now = new Date()) {
-  const mode = options.mode || 'en-to-zh';
+  const mode = options.mode || 'zh-to-en';
   assertMode(mode);
 
   const pool = filterWordsByRange(words, options, now);
@@ -95,18 +145,19 @@ export function pickRandomQuestion(words, options = {}, rng = Math.random, now =
     };
   }
 
-  const randomIndex = getRandomIndex(pool.length, rng);
+  const candidates = createQuestionCandidates(pool);
+  const candidate = pickWeightedCandidate(candidates, rng);
 
   return {
     empty: false,
-    question: buildQuestion(pool[randomIndex], mode),
+    question: buildQuestion({ ...candidate.word, meanings: [candidate.meaning] }, mode),
     poolSize: pool.length
   };
 }
 
-export function getCorrectAnswer(word, mode) {
+export function getCorrectAnswer(word, mode, meaning = getMeanings(word)[0]) {
   assertMode(mode);
-  return mode === 'en-to-zh' ? word.chinese : word.english;
+  return mode === 'en-to-zh' ? meaning.chinese : word.english;
 }
 
 export function normalizeAnswer(answer, mode) {
@@ -117,7 +168,7 @@ export function normalizeAnswer(answer, mode) {
 
 export function checkAnswer(words, input) {
   const wordId = cleanText(input.wordId);
-  const mode = input.mode || 'en-to-zh';
+  const mode = input.mode || 'zh-to-en';
   assertMode(mode);
 
   const word = words.find((item) => item.id === wordId);
@@ -126,7 +177,17 @@ export function checkAnswer(words, input) {
     throw new Error('题目不存在');
   }
 
-  const correctAnswer = getCorrectAnswer(word, mode);
+  const meaningId = cleanText(input.meaningId);
+  const meanings = getMeanings(word);
+  const meaning = meaningId
+    ? meanings.find((item) => item.id === meaningId)
+    : meanings[0];
+
+  if (!meaning) {
+    throw new Error('题目不存在');
+  }
+
+  const correctAnswer = getCorrectAnswer(word, mode, meaning);
   const correct = normalizeAnswer(input.answer, mode) === normalizeAnswer(correctAnswer, mode);
 
   return {
@@ -136,9 +197,9 @@ export function checkAnswer(words, input) {
     word: {
       id: word.id,
       english: word.english,
-      chinese: word.chinese,
-      partOfSpeech: word.partOfSpeech,
+      meanings,
       createdAt: word.createdAt
-    }
+    },
+    meaning
   };
 }

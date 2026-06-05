@@ -26,7 +26,25 @@ function renderFeedback(feedback) {
   return `<div class="feedback${toneClass}" role="status">${feedback.message}</div>`;
 }
 
-function renderCurrentQuestion(quizState) {
+function escapeHtml(value) {
+  return String(value ?? '')
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;');
+}
+
+function getQuestionEnglish(question, words = []) {
+  if (question.english) {
+    return question.english;
+  }
+
+  const word = words.find((item) => item.id === question.wordId);
+  return word?.english || '';
+}
+
+function renderCurrentQuestion(quizState, words = []) {
   const question = quizState.currentQuestion;
 
   if (!question) {
@@ -38,14 +56,36 @@ function renderCurrentQuestion(quizState) {
     `;
   }
 
+  const english = getQuestionEnglish(question, words);
   return `
     <div class="question-box">
-      <div class="question-meta">
-        <span>${PART_OF_SPEECH_LABELS[question.partOfSpeech] || '其他'}</span>
-        <span>${question.answerLanguage}</span>
-      </div>
-      <p class="question-prompt">${question.prompt}</p>
+      <p class="question-prompt">
+        <span class="question-pos">${escapeHtml(PART_OF_SPEECH_LABELS[question.partOfSpeech] || 'other')}</span>
+        <span>${escapeHtml(question.prompt)}</span>
+      </p>
+      <button
+        id="listen-word-button"
+        class="listen-button"
+        type="button"
+        data-word="${escapeHtml(english)}"
+      >听一下</button>
     </div>
+  `;
+}
+
+function renderWrongQuestionReview(quizState) {
+  if (!quizState.ended || quizState.wrongQuestions.length === 0) {
+    return '';
+  }
+
+  return `
+    <section class="wrong-review-panel" aria-label="错题重做">
+      <span>本轮错题 ${quizState.wrongQuestions.length} 道</span>
+      <button id="redo-wrong-button" class="secondary-button" type="button">
+        <span aria-hidden="true">↻</span>
+        <span>重做错题</span>
+      </button>
+    </section>
   `;
 }
 
@@ -53,6 +93,8 @@ export function renderQuizPanel(quizState, feedback, options = {}) {
   const rangeSelection = getRangeSelection(quizState);
   const customHidden = rangeSelection === 'custom' ? '' : 'hidden';
   const submitDisabled = quizState.currentQuestion && !quizState.answeredCurrent ? '' : 'disabled';
+  const startDisabled = quizState.started ? 'disabled' : '';
+  const nextDisabled = quizState.started ? '' : 'disabled';
   const addWordButton = options.showAddWordButton
     ? `
       <button id="add-word-button" class="ghost-button" type="button">
@@ -104,8 +146,24 @@ export function renderQuizPanel(quizState, feedback, options = {}) {
         </label>
       </div>
 
-      ${renderCurrentQuestion(quizState)}
+      <div class="quiz-actions">
+        <button id="quiz-start-button" class="primary-button" type="button" ${startDisabled}>
+          <span aria-hidden="true">▶</span>
+          <span>开始测试</span>
+        </button>
+        <button id="next-question-button" class="secondary-button" type="button" ${nextDisabled}>
+          <span aria-hidden="true">?</span>
+          <span>下一题</span>
+        </button>
+        <button id="finish-quiz-button" class="ghost-button" type="button" ${quizState.started ? '' : 'disabled'}>
+          <span aria-hidden="true">■</span>
+          <span>结束测试</span>
+        </button>
+      </div>
+
+      ${renderCurrentQuestion(quizState, options.words)}
       ${renderFeedback(feedback)}
+      ${renderWrongQuestionReview(quizState)}
 
       <form id="answer-form" class="answer-form">
         <label>
@@ -117,13 +175,6 @@ export function renderQuizPanel(quizState, feedback, options = {}) {
           <span>提交答案</span>
         </button>
       </form>
-
-      <div class="quiz-actions">
-        <button id="next-question-button" class="secondary-button" type="button">
-          <span aria-hidden="true">?</span>
-          <span>${quizState.currentQuestion ? '下一题' : '抽题'}</span>
-        </button>
-      </div>
 
       ${renderStatsPanel(quizState)}
     </section>

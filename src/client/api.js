@@ -42,6 +42,19 @@ export const api = {
     return request(`/api/words/lookup?${params.toString()}`);
   },
 
+  async updateWord(wordId, word) {
+    return request(`/api/words/${encodeURIComponent(wordId)}`, {
+      method: 'PUT',
+      body: JSON.stringify(word)
+    });
+  },
+
+  async deleteWord(wordId) {
+    return request(`/api/words/${encodeURIComponent(wordId)}`, {
+      method: 'DELETE'
+    });
+  },
+
   async getRandomQuestion({ mode, range, days }) {
     const params = new URLSearchParams({ mode, range });
 
@@ -52,10 +65,10 @@ export const api = {
     return request(`/api/quiz/random?${params.toString()}`);
   },
 
-  async checkAnswer({ wordId, mode, answer }) {
+  async checkAnswer({ wordId, meaningId, mode, answer }) {
     return request('/api/quiz/check', {
       method: 'POST',
-      body: JSON.stringify({ wordId, mode, answer })
+      body: JSON.stringify({ wordId, meaningId, mode, answer })
     });
   }
 };

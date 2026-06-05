@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  compactChineseDefinition,
   lookupWordDefinitions,
   parseYoudaoLookup,
   parseYoudaoSuggest
@@ -30,6 +31,20 @@ test('parses Youdao English-Chinese definitions into word candidates', () => {
     { english: 'apple', partOfSpeech: 'verb', chinese: '申请；应用' },
     { english: 'apple', partOfSpeech: 'adjective', chinese: '快的' }
   ]);
+});
+
+test('compacts long dictionary explanations into memory-friendly meanings', () => {
+  assert.equal(
+    compactChineseDefinition('（书面或口头的）测验，考试；（医疗上的）检查，化验，检验；复杂解释'),
+    '测验；考试；检查'
+  );
+});
+
+test('removes participle notes from compact meanings', () => {
+  assert.equal(
+    compactChineseDefinition('使不安，使恐慌；给（门等）安装警报器（alarm 的现在分词）'),
+    '使不安；使恐慌；给安装警报器'
+  );
 });
 
 test('parses Youdao suggestions for the exact queried word', () => {

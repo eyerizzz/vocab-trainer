@@ -88,7 +88,11 @@ export const server = createServer(async (request, response) => {
 
     sendJson(response, 404, { error: '页面不存在' });
   } catch (error) {
-    const statusCode = error.message === '题目不存在' ? 404 : 400;
+    const statusCode = ['题目不存在', '单词不存在'].includes(error.message)
+      ? 404
+      : error.message === '英文单词已存在'
+        ? 409
+        : 400;
     sendJson(response, statusCode, { error: error.message || '服务器错误' });
   }
 });

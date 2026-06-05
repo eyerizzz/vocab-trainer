@@ -1,13 +1,22 @@
 import { api } from './api.js';
-import { createQuizState, recordAnswer, resetQuizProgress } from './state.js';
+import {
+  createQuizState,
+  recordAnswer,
+  recordWrongQuestion,
+  resetQuizProgress,
+  startWrongQuestionReview
+} from './state.js';
 import { renderQuizPanel } from './components/QuizPanel.js';
 import { renderWordForm } from './components/WordForm.js';
+import { renderWordLibrary } from './components/WordLibrary.js';
 
 const app = document.querySelector('#app');
 
 const state = {
   words: [],
   activePanel: 'add',
+  libraryEditingId: null,
+  librarySort: 'default',
   quiz: createQuizState(),
   wordForm: {
     english: '',
@@ -29,6 +38,9 @@ let lookupTimer = null;
 let lookupRequestId = 0;
 let noticeTimer = null;
 let noticeId = 0;
+let pronunciationAudio = null;
+const lookupDelayMs = 1100;
+const pronunciationFallbackDelayMs = 1400;
 
 function getCandidateKey(candidate) {
   return `${candidate.partOfSpeech}|${candidate.chinese}`;
@@ -70,25 +82,33 @@ function renderNotice() {
   return `<div class="notice notice-${state.notice.tone}" role="status">${state.notice.message}</div>`;
 }
 
-function renderStartTestPanel() {
+function renderFeatureEntrypoints() {
   return `
     <section class="panel collapsed-feature-panel" aria-label="测试入口">
-      <button id="start-test-button" class="feature-start-button" type="button">
-        <span aria-hidden="true"></span>
-        <span>开始测试</span>
-      </button>
+      <div class="feature-entry-grid">
+        <button id="start-test-button" class="feature-start-button" type="button">
+          <span>开始测试</span>
+        </button>
+        <button id="view-library-button" class="feature-start-button" type="button">
+          <span>查看词库</span>
+        </button>
+      </div>
     </section>
   `;
 }
 
 function renderActiveFeature() {
   if (state.activePanel === 'quiz') {
-    return renderQuizPanel(state.quiz, state.feedback, { showAddWordButton: true });
+    return renderQuizPanel(state.quiz, state.feedback, { showAddWordButton: true, words: state.words });
+  }
+
+  if (state.activePanel === 'library') {
+    return renderWordLibrary(state.words, state.libraryEditingId, state.librarySort);
   }
 
   return `
     ${renderWordForm(state.wordForm, state.wordLookup)}
-    ${renderStartTestPanel()}
+    ${renderFeatureEntrypoints()}
   `;
 }
 
@@ -105,6 +125,101 @@ function render() {
   `;
 
   bindEvents();
+  focusAnswerInput();
+}
+
+function focusAnswerInput() {
+  const answerInput = document.querySelector('#answer-form input[name="answer"]:not(:disabled)');
+
+  if (answerInput) {
+    answerInput.focus();
+    answerInput.select();
+  }
+}
+
+function focusWordInput() {
+  const wordInput = document.querySelector('#word-form input[name="english"]');
+
+  if (wordInput) {
+    wordInput.focus();
+    wordInput.select();
+  }
+}
+
+function speakWithBrowserVoice(english) {
+  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+    setFeedback('暂时无法播放发音', 'warning');
+    render();
+    return;
+  }
+
+  window.speechSynthesis.cancel();
+  const utterance = new SpeechSynthesisUtterance(english);
+  utterance.lang = 'en-US';
+  utterance.rate = 0.9;
+  window.speechSynthesis.speak(utterance);
+}
+
+function showListenButtonResponse(button, label = '播放中') {
+  if (!button) {
+    return;
+  }
+
+  const defaultLabel = button.dataset.defaultLabel || button.textContent.trim() || '听一下';
+  button.dataset.defaultLabel = defaultLabel;
+  button.textContent = label;
+  button.classList.add('is-active');
+
+  window.setTimeout(() => {
+    if (button.isConnected) {
+      button.textContent = defaultLabel;
+      button.classList.remove('is-active');
+    }
+  }, 900);
+}
+
+function playPronunciation(word, button) {
+  const english = String(word || '').trim();
+  showListenButtonResponse(button);
+
+  if (!english) {
+    setFeedback('当前题目没有可播放的英文单词', 'warning');
+    render();
+    return;
+  }
+
+  let didFallback = false;
+  let fallbackTimer = null;
+  const fallback = () => {
+    if (didFallback) {
+      return;
+    }
+
+    didFallback = true;
+    clearTimeout(fallbackTimer);
+    pronunciationAudio?.pause();
+    showListenButtonResponse(button, '已朗读');
+    speakWithBrowserVoice(english);
+  };
+
+  try {
+    pronunciationAudio?.pause();
+    pronunciationAudio = new Audio(
+      `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(english)}&type=2`
+    );
+    pronunciationAudio.addEventListener('error', fallback, { once: true });
+    pronunciationAudio.addEventListener('playing', () => {
+      clearTimeout(fallbackTimer);
+    }, { once: true });
+    const playResult = pronunciationAudio.play();
+    fallbackTimer = window.setTimeout(fallback, pronunciationFallbackDelayMs);
+
+    if (playResult?.catch) {
+      playResult.catch(fallback);
+    }
+  } catch {
+    fallback();
+  }
 }
 
 async function loadWords() {
@@ -118,7 +233,7 @@ async function refreshWords() {
 }
 
 function applyQuizControlsFromForm() {
-  const mode = document.querySelector('#quiz-mode')?.value || 'en-to-zh';
+  const mode = document.querySelector('#quiz-mode')?.value || 'zh-to-en';
   const rangeSelection = document.querySelector('#quiz-range')?.value || 'all';
   const daysInput = document.querySelector('#quiz-days');
   let range = rangeSelection;
@@ -178,7 +293,7 @@ async function handleWordSubmit(event) {
           partOfSpeech: state.wordForm.partOfSpeech
         });
 
-    const savedCount = result.words?.length || 1;
+    const savedCount = result.savedCount || result.words?.length || 1;
     clearTimeout(lookupTimer);
     lookupTimer = null;
     lookupRequestId += 1;
@@ -188,6 +303,7 @@ async function handleWordSubmit(event) {
       autoDismissMs: 1800
     });
     await refreshWords();
+    focusWordInput();
   } catch (error) {
     setNotice(error.message, 'error');
     render();
@@ -228,12 +344,23 @@ async function lookupWord(english, requestId) {
       return;
     }
 
+    const firstCandidate = result.candidates[0];
+
     state.wordLookup = {
       english: result.english,
       status: result.candidates.length ? 'ready' : 'empty',
       candidates: result.candidates,
-      selectedKeys: []
+      selectedKeys: firstCandidate ? [getCandidateKey(firstCandidate)] : []
     };
+
+    if (firstCandidate) {
+      state.wordForm = {
+        english: result.english,
+        chinese: firstCandidate.chinese,
+        partOfSpeech: firstCandidate.partOfSpeech
+      };
+    }
+
     render();
   } catch (error) {
     if (requestId !== lookupRequestId) {
@@ -257,7 +384,7 @@ function scheduleWordLookup(english) {
   const requestId = lookupRequestId;
   lookupTimer = setTimeout(() => {
     lookupWord(english, requestId);
-  }, 520);
+  }, lookupDelayMs);
 }
 
 function handleWordFormInput(event) {
@@ -290,6 +417,10 @@ function handleLookupCandidateChange(event) {
 }
 
 async function handleNextQuestion() {
+  if (!state.quiz.started) {
+    return;
+  }
+
   applyQuizControlsFromForm();
 
   if (state.quiz.range === 'recent' && (!Number.isInteger(state.quiz.days) || state.quiz.days <= 0)) {
@@ -299,27 +430,73 @@ async function handleNextQuestion() {
   }
 
   try {
-    const result = await api.getRandomQuestion({
-      mode: state.quiz.mode,
-      range: state.quiz.range,
-      days: state.quiz.days
-    });
-
-    if (result.empty) {
-      state.quiz.currentQuestion = null;
-      state.quiz.answeredCurrent = false;
-      setFeedback(result.message, 'warning');
-    } else {
-      state.quiz.currentQuestion = result.question;
-      state.quiz.answeredCurrent = false;
-      setFeedback(`已从 ${result.poolSize} 条可测试单词中抽题`, 'neutral');
-    }
-
+    await loadNextQuestion();
     render();
   } catch (error) {
     setFeedback(error.message, 'error');
     render();
   }
+}
+
+async function handleQuizStart() {
+  applyQuizControlsFromForm();
+
+  if (state.quiz.range === 'recent' && (!Number.isInteger(state.quiz.days) || state.quiz.days <= 0)) {
+    setFeedback('自定义天数必须是正整数', 'error');
+    render();
+    return;
+  }
+
+  try {
+    state.quiz.started = true;
+    await loadNextQuestion();
+    render();
+  } catch (error) {
+    state.quiz.started = false;
+    setFeedback(error.message, 'error');
+    render();
+  }
+}
+
+async function loadNextQuestion(successMessage) {
+  if (state.quiz.reviewMode) {
+    const nextQuestion = state.quiz.reviewQueue.shift();
+
+    if (!nextQuestion) {
+      state.quiz.currentQuestion = null;
+      state.quiz.answeredCurrent = false;
+      state.quiz.started = false;
+      state.quiz.ended = true;
+      state.quiz.reviewMode = false;
+      setFeedback('错题已重做完成', 'success');
+      return;
+    }
+
+    state.quiz.started = true;
+    state.quiz.currentQuestion = nextQuestion;
+    state.quiz.answeredCurrent = false;
+    setFeedback(null);
+    return;
+  }
+
+  const result = await api.getRandomQuestion({
+    mode: state.quiz.mode,
+    range: state.quiz.range,
+    days: state.quiz.days
+  });
+
+  if (result.empty) {
+    state.quiz.currentQuestion = null;
+    state.quiz.answeredCurrent = false;
+    state.quiz.started = false;
+    setFeedback(result.message, 'warning');
+    return;
+  }
+
+  state.quiz.started = true;
+  state.quiz.currentQuestion = result.question;
+  state.quiz.answeredCurrent = false;
+  setFeedback(null);
 }
 
 async function handleAnswerSubmit(event) {
@@ -335,17 +512,23 @@ async function handleAnswerSubmit(event) {
   try {
     const result = await api.checkAnswer({
       wordId: state.quiz.currentQuestion.wordId,
+      meaningId: state.quiz.currentQuestion.meaningId,
       mode: state.quiz.mode,
       answer
     });
 
     recordAnswer(state.quiz, result.correct);
-    state.quiz.answeredCurrent = true;
 
     if (result.correct) {
-      setFeedback('回答正确', 'success');
+      state.quiz.answeredCurrent = true;
+      await loadNextQuestion();
     } else {
-      setFeedback(`回答错误，正确答案是：${result.correctAnswer}`, 'error');
+      state.quiz.answeredCurrent = false;
+      recordWrongQuestion(state.quiz, {
+        question: state.quiz.currentQuestion,
+        submittedAnswer: String(answer || '').trim()
+      });
+      setFeedback('回答错误', 'error');
     }
 
     render();
@@ -362,16 +545,97 @@ function handleQuizControlChange() {
 
 function showAddPanel() {
   state.activePanel = 'add';
+  state.libraryEditingId = null;
   render();
+  focusWordInput();
 }
 
 function showQuizPanel() {
   state.activePanel = 'quiz';
+  state.libraryEditingId = null;
   clearTimeout(lookupTimer);
   lookupTimer = null;
   lookupRequestId += 1;
   setNotice(null);
   render();
+}
+
+function finishQuiz() {
+  state.quiz.started = false;
+  state.quiz.ended = true;
+  state.quiz.currentQuestion = null;
+  state.quiz.answeredCurrent = false;
+  state.quiz.reviewMode = false;
+  state.quiz.reviewQueue = [];
+  setFeedback(null);
+  render();
+}
+
+async function redoWrongQuestions() {
+  if (state.quiz.wrongQuestions.length === 0) {
+    return;
+  }
+
+  startWrongQuestionReview(state.quiz);
+  await loadNextQuestion();
+  render();
+}
+
+function showLibraryPanel() {
+  state.activePanel = 'library';
+  state.libraryEditingId = null;
+  setNotice(null);
+  render();
+}
+
+function toggleLibraryErrorSort() {
+  state.librarySort = state.librarySort === 'frequent-errors' ? 'default' : 'frequent-errors';
+  state.libraryEditingId = null;
+  render();
+}
+
+async function handleWordEditSubmit(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData(form);
+  const partOfSpeechValues = formData.getAll('partOfSpeech');
+  const chineseValues = formData.getAll('chinese');
+  const meanings = partOfSpeechValues
+    .map((partOfSpeech, index) => ({
+      partOfSpeech,
+      chinese: String(chineseValues[index] || '').trim()
+    }))
+    .filter((meaning) => meaning.chinese);
+
+  try {
+    await api.updateWord(form.dataset.wordId, {
+      english: formData.get('english'),
+      meanings
+    });
+    state.libraryEditingId = null;
+    setNotice('单词已更新', 'success', { autoDismissMs: 1800 });
+    await refreshWords();
+  } catch (error) {
+    setNotice(error.message, 'error');
+    render();
+  }
+}
+
+async function handleDeleteWord(wordId) {
+  const word = state.words.find((item) => item.id === wordId);
+
+  if (!word || !window.confirm(`确定删除 ${word.english} 吗？`)) {
+    return;
+  }
+
+  try {
+    await api.deleteWord(wordId);
+    setNotice('单词已删除', 'success', { autoDismissMs: 1800 });
+    await refreshWords();
+  } catch (error) {
+    setNotice(error.message, 'error');
+    render();
+  }
 }
 
 function bindEvents() {
@@ -384,7 +648,14 @@ function bindEvents() {
     handleLookupCandidateChange(event);
   });
   document.querySelector('#answer-form')?.addEventListener('submit', handleAnswerSubmit);
+  document.querySelector('#quiz-start-button')?.addEventListener('click', handleQuizStart);
   document.querySelector('#next-question-button')?.addEventListener('click', handleNextQuestion);
+  document.querySelector('#finish-quiz-button')?.addEventListener('click', finishQuiz);
+  document.querySelector('#listen-word-button')?.addEventListener('click', (event) => {
+    playPronunciation(event.currentTarget.dataset.word, event.currentTarget);
+    focusAnswerInput();
+  });
+  document.querySelector('#redo-wrong-button')?.addEventListener('click', redoWrongQuestions);
   document.querySelector('#reset-quiz-button')?.addEventListener('click', () => {
     resetQuizProgress(state.quiz);
     setFeedback(null);
@@ -392,6 +663,28 @@ function bindEvents() {
   });
   document.querySelector('#start-test-button')?.addEventListener('click', showQuizPanel);
   document.querySelector('#add-word-button')?.addEventListener('click', showAddPanel);
+  document.querySelector('#view-library-button')?.addEventListener('click', showLibraryPanel);
+  document.querySelector('#library-add-button')?.addEventListener('click', showAddPanel);
+  document.querySelector('#library-test-button')?.addEventListener('click', showQuizPanel);
+  document.querySelector('#library-error-sort-button')?.addEventListener('click', toggleLibraryErrorSort);
+  document.querySelectorAll('.edit-word-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.libraryEditingId = button.dataset.wordId;
+      render();
+    });
+  });
+  document.querySelectorAll('.delete-word-button').forEach((button) => {
+    button.addEventListener('click', () => handleDeleteWord(button.dataset.wordId));
+  });
+  document.querySelectorAll('.word-edit-form').forEach((form) => {
+    form.addEventListener('submit', handleWordEditSubmit);
+  });
+  document.querySelectorAll('.cancel-edit-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      state.libraryEditingId = null;
+      render();
+    });
+  });
   document.querySelector('#quiz-mode')?.addEventListener('change', handleQuizControlChange);
   document.querySelector('#quiz-range')?.addEventListener('change', handleQuizControlChange);
   document.querySelector('#quiz-days')?.addEventListener('change', handleQuizControlChange);

@@ -87,7 +87,6 @@ export function renderWordForm(form = {}, lookup = { status: 'idle', candidates:
     <section class="panel input-panel" aria-labelledby="word-form-title">
       <div class="panel-header">
         <div>
-          <p class="eyebrow">（录入）</p>
           <h2 id="word-form-title">添加单词</h2>
         </div>
       </div>

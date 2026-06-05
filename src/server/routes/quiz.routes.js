@@ -1,4 +1,4 @@
-import { getWords } from '../services/wordStore.js';
+import { getWords, incrementMeaningError } from '../services/wordStore.js';
 import { checkAnswer, pickRandomQuestion } from '../services/quizService.js';
 
 async function readJsonBody(request) {
@@ -20,7 +20,7 @@ function sendJson(response, statusCode, payload) {
 
 export async function handleQuizRoute(request, response, url) {
   if (url.pathname === '/api/quiz/random' && request.method === 'GET') {
-    const mode = url.searchParams.get('mode') || 'en-to-zh';
+    const mode = url.searchParams.get('mode') || 'zh-to-en';
     const range = url.searchParams.get('range') || 'all';
     const days = url.searchParams.get('days');
     const words = await getWords();
@@ -34,6 +34,11 @@ export async function handleQuizRoute(request, response, url) {
     const input = await readJsonBody(request);
     const words = await getWords();
     const result = checkAnswer(words, input);
+
+    if (!result.correct) {
+      const updated = await incrementMeaningError(result.word.id, result.meaning.id);
+      result.meaning.errorCount = updated.meaning.errorCount;
+    }
 
     sendJson(response, 200, result);
     return;
