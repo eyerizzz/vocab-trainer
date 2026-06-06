@@ -59,6 +59,31 @@ http://localhost:3000
 npm start
 ```
 
+## 桌面 App
+
+安装依赖后可以用 Electron 打开桌面版：
+
+```bash
+npm install
+npm run desktop
+```
+
+桌面版会自动启动本地服务并打开应用窗口，不需要手动访问 `localhost:3000`。
+
+桌面版的词库保存在系统应用数据目录，不再写入项目里的 `data/words.json`：
+
+- macOS: `~/Library/Application Support/Vocab Trainer/words.json`
+- Windows: `%APPDATA%/Vocab Trainer/words.json`
+- Linux: `~/.config/Vocab Trainer/words.json`
+
+如果要生成安装包，可以运行：
+
+```bash
+npm run build:desktop
+```
+
+生成结果会放在 `dist/`。
+
 ## 测试
 
 ```bash

@@ -5,7 +5,9 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, '../../..');
-const defaultWordsFile = path.join(projectRoot, 'data', 'words.json');
+const defaultWordsFile = process.env.WORDS_FILE
+  ? path.resolve(process.env.WORDS_FILE)
+  : path.join(projectRoot, 'data', 'words.json');
 
 export const PART_OF_SPEECH_OPTIONS = [
   'noun',

@@ -3,8 +3,27 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "main": "src/electron/main.js",
   "scripts": {
     "start": "node src/server/server.js",
+    "desktop": "electron .",
+    "build:desktop": "electron-builder",
     "test": "node --test tests/*.test.js"
+  },
+  "devDependencies": {
+    "electron": "^31.7.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.local.vocabtrainer",
+    "productName": "Vocab Trainer",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "package.json",
+      "public/**/*",
+      "src/**/*"
+    ]
   }
 }
