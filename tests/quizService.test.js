@@ -96,6 +96,36 @@ test('keeps random selection inside the available pool', () => {
   assert.equal(last.poolSize, 4);
 });
 
+test('excludes words already seen in the current round', () => {
+  const result = pickRandomQuestion(
+    words,
+    { mode: 'en-to-zh', range: 'all', excludeWordIds: ['word_old', 'word_week'] },
+    () => 0,
+    fixedNow
+  );
+
+  assert.equal(result.empty, false);
+  assert.equal(result.question.wordId, 'word_today');
+});
+
+test('returns exhausted state when all words in range were seen', () => {
+  const result = pickRandomQuestion(
+    words,
+    {
+      mode: 'en-to-zh',
+      range: 'today',
+      excludeWordIds: ['word_today']
+    },
+    () => 0,
+    fixedNow
+  );
+
+  assert.equal(result.empty, true);
+  assert.equal(result.exhausted, true);
+  assert.equal(result.message, '本轮题目已完成');
+  assert.equal(result.poolSize, 1);
+});
+
 test('builds questions for both quiz modes', () => {
   const enToZh = pickRandomQuestion(words, { mode: 'en-to-zh', range: 'all' }, () => 0, fixedNow);
   const zhToEn = pickRandomQuestion(words, { mode: 'zh-to-en', range: 'all' }, () => 0, fixedNow);

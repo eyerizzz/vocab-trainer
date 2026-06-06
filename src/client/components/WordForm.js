@@ -25,6 +25,27 @@ export function renderPartOfSpeechOptions(selected = 'noun') {
     .join('');
 }
 
+function getSelectedPartOfSpeeches(partOfSpeech = []) {
+  const values = Array.isArray(partOfSpeech) ? partOfSpeech : [partOfSpeech];
+  return values.filter(Boolean);
+}
+
+function renderPartOfSpeechChoices(partOfSpeech = []) {
+  const selectedValues = getSelectedPartOfSpeeches(partOfSpeech);
+
+  return Object.entries(PART_OF_SPEECH_LABELS)
+    .map(([value, label]) => {
+      const checked = selectedValues.includes(value) ? 'checked' : '';
+      return `
+        <label class="part-choice">
+          <input type="checkbox" name="partOfSpeech" value="${value}" ${checked} />
+          <span>${label}</span>
+        </label>
+      `;
+    })
+    .join('');
+}
+
 function getCandidateKey(candidate) {
   return `${candidate.partOfSpeech}|${candidate.chinese}`;
 }
@@ -81,7 +102,7 @@ function renderLookupArea(lookup) {
 export function renderWordForm(form = {}, lookup = { status: 'idle', candidates: [], selectedKeys: [] }) {
   const english = escapeHtml(form.english || '');
   const chinese = escapeHtml(form.chinese || '');
-  const partOfSpeech = form.partOfSpeech || 'noun';
+  const partOfSpeech = form.partOfSpeech || [];
 
   return `
     <section class="panel input-panel" aria-labelledby="word-form-title">
@@ -101,20 +122,19 @@ export function renderWordForm(form = {}, lookup = { status: 'idle', candidates:
 
         <label>
           <span>中文释义</span>
-          <input name="chinese" autocomplete="off" placeholder="例子；示例" value="${chinese}" />
+          <textarea name="chinese" autocomplete="off" placeholder="例子；示例">${chinese}</textarea>
         </label>
 
-        <label>
-          <span>词性</span>
-          <select name="partOfSpeech" required>
-            ${renderPartOfSpeechOptions(partOfSpeech)}
-          </select>
-        </label>
+        <div class="word-form-footer">
+          <fieldset class="part-choice-group">
+            <legend>词性</legend>
+            <div class="part-choice-grid">
+              ${renderPartOfSpeechChoices(partOfSpeech)}
+            </div>
+          </fieldset>
 
-        <button class="primary-button" type="submit">
-          <span aria-hidden="true">+</span>
-          <span>保存单词</span>
-        </button>
+          <button class="primary-button word-save-button" type="submit">保存单词</button>
+        </div>
       </form>
     </section>
   `;

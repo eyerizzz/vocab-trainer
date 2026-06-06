@@ -1,13 +1,15 @@
 import { api } from './api.js';
 import {
   createQuizState,
+  hasWrongQuestion,
   recordAnswer,
+  recordSeenWord,
   recordWrongQuestion,
   resetQuizProgress,
   startWrongQuestionReview
 } from './state.js';
 import { renderQuizPanel } from './components/QuizPanel.js';
-import { renderWordForm } from './components/WordForm.js';
+import { PART_OF_SPEECH_LABELS, renderWordForm } from './components/WordForm.js';
 import { renderWordLibrary } from './components/WordLibrary.js';
 
 const app = document.querySelector('#app');
@@ -17,11 +19,12 @@ const state = {
   activePanel: 'add',
   libraryEditingId: null,
   librarySort: 'default',
+  librarySearch: '',
   quiz: createQuizState(),
   wordForm: {
     english: '',
     chinese: '',
-    partOfSpeech: 'noun'
+    partOfSpeech: []
   },
   wordLookup: {
     english: '',
@@ -46,6 +49,46 @@ function getCandidateKey(candidate) {
   return `${candidate.partOfSpeech}|${candidate.chinese}`;
 }
 
+const partOfSpeechByLabel = Object.fromEntries(
+  Object.entries(PART_OF_SPEECH_LABELS).map(([value, label]) => [label.toLowerCase(), value])
+);
+
+function formatMeaningLine(meaning) {
+  const label = PART_OF_SPEECH_LABELS[meaning.partOfSpeech] || PART_OF_SPEECH_LABELS.other;
+  return `${label} ${meaning.chinese}`;
+}
+
+function getSelectedPartOfSpeeches(formData) {
+  const values = formData.getAll('partOfSpeech').filter(Boolean);
+  return values;
+}
+
+function parseMeaningLines(english, chineseText, fallbackPartOfSpeeches) {
+  const fallbackValues = Array.isArray(fallbackPartOfSpeeches) ? fallbackPartOfSpeeches : [];
+
+  return String(chineseText || '')
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .flatMap((line) => {
+      const match = line.match(/^(n\.|v\.|adj\.|adv\.|phr\.|other)\s+(.+)$/i);
+
+      if (!match) {
+        return fallbackValues.map((partOfSpeech) => ({
+          english,
+          chinese: line,
+          partOfSpeech
+        }));
+      }
+
+      return {
+        english,
+        chinese: match[2].trim(),
+        partOfSpeech: partOfSpeechByLabel[match[1].toLowerCase()] || fallbackValues[0] || 'other'
+      };
+    });
+}
+
 function setNotice(message, tone = 'neutral', options = {}) {
   if (noticeTimer) {
     clearTimeout(noticeTimer);
@@ -58,7 +101,13 @@ function setNotice(message, tone = 'neutral', options = {}) {
   }
 
   const currentNoticeId = ++noticeId;
-  state.notice = { message, tone, id: currentNoticeId };
+  state.notice = {
+    message,
+    tone,
+    id: currentNoticeId,
+    action: options.action || null,
+    actionLabel: options.actionLabel || ''
+  };
 
   if (options.autoDismissMs) {
     noticeTimer = setTimeout(() => {
@@ -79,7 +128,16 @@ function renderNotice() {
     return '';
   }
 
-  return `<div class="notice notice-${state.notice.tone}" role="status">${state.notice.message}</div>`;
+  const actionButton = state.notice.action
+    ? `<button id="notice-action-button" class="notice-action" type="button">${state.notice.actionLabel}</button>`
+    : '';
+
+  return `
+    <div class="notice notice-${state.notice.tone}" role="status">
+      <span>${state.notice.message}</span>
+      ${actionButton}
+    </div>
+  `;
 }
 
 function renderFeatureEntrypoints() {
@@ -103,7 +161,7 @@ function renderActiveFeature() {
   }
 
   if (state.activePanel === 'library') {
-    return renderWordLibrary(state.words, state.libraryEditingId, state.librarySort);
+    return renderWordLibrary(state.words, state.libraryEditingId, state.librarySort, state.librarySearch);
   }
 
   return `
@@ -137,12 +195,18 @@ function focusAnswerInput() {
   }
 }
 
-function focusWordInput() {
+function focusWordInput(options = {}) {
   const wordInput = document.querySelector('#word-form input[name="english"]');
 
   if (wordInput) {
     wordInput.focus();
-    wordInput.select();
+
+    if (options.select === false) {
+      const end = wordInput.value.length;
+      wordInput.setSelectionRange(end, end);
+    } else {
+      wordInput.select();
+    }
   }
 }
 
@@ -232,6 +296,21 @@ async function refreshWords() {
   render();
 }
 
+function replaceStoredWord(updatedWord) {
+  if (!updatedWord?.id) {
+    return;
+  }
+
+  state.words = state.words.map((word) => (
+    word.id === updatedWord.id ? updatedWord : word
+  ));
+}
+
+function findExistingWord(english) {
+  const normalizedEnglish = String(english || '').trim().toLowerCase();
+  return state.words.find((word) => word.english.toLowerCase() === normalizedEnglish);
+}
+
 function applyQuizControlsFromForm() {
   const mode = document.querySelector('#quiz-mode')?.value || 'zh-to-en';
   const rangeSelection = document.querySelector('#quiz-range')?.value || 'all';
@@ -267,37 +346,48 @@ async function handleWordSubmit(event) {
   const form = event.currentTarget;
   const formData = new FormData(form);
   const english = String(formData.get('english') || '').trim();
-  const selectedIndexes = formData
-    .getAll('lookupCandidate')
-    .map((value) => Number(value))
-    .filter((value) => Number.isInteger(value));
-  const canUseLookup = state.wordLookup.english === english.toLowerCase();
-  const selectedCandidates = canUseLookup
-    ? selectedIndexes
-        .map((index) => state.wordLookup.candidates[index])
-        .filter(Boolean)
-    : [];
+  const chinese = String(formData.get('chinese') || '').trim();
+  const partOfSpeeches = getSelectedPartOfSpeeches(formData);
+  const meanings = parseMeaningLines(english, chinese, partOfSpeeches);
 
   state.wordForm = {
     english,
-    chinese: String(formData.get('chinese') || '').trim(),
-    partOfSpeech: formData.get('partOfSpeech') || 'noun'
+    chinese,
+    partOfSpeech: partOfSpeeches
   };
 
+  if (meanings.length === 0 && chinese) {
+    setNotice('请选择词性，或在中文释义前写 n. / v. / adj. 等词性', 'warning');
+    render();
+    return;
+  }
+
+  const existingWord = findExistingWord(english);
+
+  if (existingWord) {
+    setNotice('这个单词已添加过了', 'warning', {
+      action: 'library',
+      actionLabel: '去词库'
+    });
+    render();
+    focusWordInput({ select: false });
+    return;
+  }
+
   try {
-    const result = selectedCandidates.length
-      ? await api.addWords(selectedCandidates)
+    const result = meanings.length > 1
+      ? await api.addWords(meanings)
       : await api.addWord({
-          english: state.wordForm.english,
-          chinese: state.wordForm.chinese,
-          partOfSpeech: state.wordForm.partOfSpeech
+          english: meanings[0]?.english || state.wordForm.english,
+          chinese: meanings[0]?.chinese || state.wordForm.chinese,
+          partOfSpeech: meanings[0]?.partOfSpeech || state.wordForm.partOfSpeech[0]
         });
 
     const savedCount = result.savedCount || result.words?.length || 1;
     clearTimeout(lookupTimer);
     lookupTimer = null;
     lookupRequestId += 1;
-    state.wordForm = { english: '', chinese: '', partOfSpeech: 'noun' };
+    state.wordForm = { english: '', chinese: '', partOfSpeech: [] };
     state.wordLookup = { english: '', status: 'idle', candidates: [], selectedKeys: [] };
     setNotice(savedCount > 1 ? `已保存 ${savedCount} 条释义` : '单词已保存', 'success', {
       autoDismissMs: 1800
@@ -316,7 +406,7 @@ function updateWordFormDraft(form) {
   state.wordForm = {
     english: String(formData.get('english') || ''),
     chinese: String(formData.get('chinese') || ''),
-    partOfSpeech: formData.get('partOfSpeech') || 'noun'
+    partOfSpeech: getSelectedPartOfSpeeches(formData)
   };
 }
 
@@ -344,24 +434,15 @@ async function lookupWord(english, requestId) {
       return;
     }
 
-    const firstCandidate = result.candidates[0];
-
     state.wordLookup = {
       english: result.english,
       status: result.candidates.length ? 'ready' : 'empty',
       candidates: result.candidates,
-      selectedKeys: firstCandidate ? [getCandidateKey(firstCandidate)] : []
+      selectedKeys: []
     };
 
-    if (firstCandidate) {
-      state.wordForm = {
-        english: result.english,
-        chinese: firstCandidate.chinese,
-        partOfSpeech: firstCandidate.partOfSpeech
-      };
-    }
-
     render();
+    focusWordInput({ select: false });
   } catch (error) {
     if (requestId !== lookupRequestId) {
       return;
@@ -374,6 +455,7 @@ async function lookupWord(english, requestId) {
       selectedKeys: []
     };
     render();
+    focusWordInput({ select: false });
   }
 }
 
@@ -414,6 +496,21 @@ function handleLookupCandidateChange(event) {
     .map((index) => state.wordLookup.candidates[index])
     .filter(Boolean)
     .map(getCandidateKey);
+
+  const selectedCandidates = selectedIndexes
+    .map((index) => state.wordLookup.candidates[index])
+    .filter(Boolean);
+
+  if (selectedCandidates.length > 0) {
+    state.wordForm.chinese = selectedCandidates.map(formatMeaningLine).join('\n');
+    state.wordForm.partOfSpeech = [...new Set(
+      selectedCandidates.map((candidate) => candidate.partOfSpeech).filter(Boolean)
+    )];
+  } else {
+    state.wordForm.chinese = '';
+  }
+
+  render();
 }
 
 async function handleNextQuestion() {
@@ -430,7 +527,18 @@ async function handleNextQuestion() {
   }
 
   try {
-    await loadNextQuestion();
+    let feedbackMessage = null;
+
+    if (state.quiz.currentQuestion && !state.quiz.answeredCurrent) {
+      await addCurrentQuestionToWrongSet({
+        countAsAnswer: true,
+        persistError: true,
+        reason: 'skipped'
+      });
+      feedbackMessage = '已跳过，已加入错题本';
+    }
+
+    await loadNextQuestion(feedbackMessage);
     render();
   } catch (error) {
     setFeedback(error.message, 'error');
@@ -448,6 +556,7 @@ async function handleQuizStart() {
   }
 
   try {
+    resetQuizProgress(state.quiz);
     state.quiz.started = true;
     await loadNextQuestion();
     render();
@@ -464,6 +573,7 @@ async function loadNextQuestion(successMessage) {
 
     if (!nextQuestion) {
       state.quiz.currentQuestion = null;
+      state.quiz.currentWrongAttempts = 0;
       state.quiz.answeredCurrent = false;
       state.quiz.started = false;
       state.quiz.ended = true;
@@ -474,29 +584,63 @@ async function loadNextQuestion(successMessage) {
 
     state.quiz.started = true;
     state.quiz.currentQuestion = nextQuestion;
+    state.quiz.currentWrongAttempts = 0;
     state.quiz.answeredCurrent = false;
-    setFeedback(null);
+    setFeedback(successMessage || null, successMessage ? 'warning' : 'neutral');
     return;
   }
 
   const result = await api.getRandomQuestion({
     mode: state.quiz.mode,
     range: state.quiz.range,
-    days: state.quiz.days
+    days: state.quiz.days,
+    excludeWordIds: state.quiz.seenWordIds
   });
 
   if (result.empty) {
     state.quiz.currentQuestion = null;
+    state.quiz.currentWrongAttempts = 0;
     state.quiz.answeredCurrent = false;
     state.quiz.started = false;
+    state.quiz.ended = Boolean(result.exhausted);
     setFeedback(result.message, 'warning');
     return;
   }
 
   state.quiz.started = true;
+  state.quiz.ended = false;
   state.quiz.currentQuestion = result.question;
+  recordSeenWord(state.quiz, result.question.wordId);
+  state.quiz.currentWrongAttempts = 0;
   state.quiz.answeredCurrent = false;
-  setFeedback(null);
+  setFeedback(successMessage || null, successMessage ? 'warning' : 'neutral');
+}
+
+async function addCurrentQuestionToWrongSet(options = {}) {
+  const question = state.quiz.currentQuestion;
+
+  if (!question) {
+    return;
+  }
+
+  if (options.countAsAnswer) {
+    recordAnswer(state.quiz, false);
+  }
+
+  const addedToWrongSet = recordWrongQuestion(state.quiz, {
+    question,
+    submittedAnswer: options.submittedAnswer || '',
+    reason: options.reason || 'wrong'
+  });
+
+  if (addedToWrongSet && options.persistError !== false) {
+    const result = await api.markWrong({
+      wordId: question.wordId,
+      meaningId: question.meaningId,
+      reason: options.reason
+    });
+    replaceStoredWord(result.word);
+  }
 }
 
 async function handleAnswerSubmit(event) {
@@ -521,14 +665,22 @@ async function handleAnswerSubmit(event) {
 
     if (result.correct) {
       state.quiz.answeredCurrent = true;
+      state.quiz.currentWrongAttempts = 0;
       await loadNextQuestion();
     } else {
-      state.quiz.answeredCurrent = false;
-      recordWrongQuestion(state.quiz, {
-        question: state.quiz.currentQuestion,
-        submittedAnswer: String(answer || '').trim()
-      });
-      setFeedback('回答错误', 'error');
+      state.quiz.currentWrongAttempts += 1;
+
+      if (state.quiz.currentWrongAttempts >= 2) {
+        state.quiz.answeredCurrent = true;
+        await addCurrentQuestionToWrongSet({
+          submittedAnswer: String(answer || '').trim(),
+          reason: 'two-wrong'
+        });
+        await loadNextQuestion('已错两次，已加入错题本');
+      } else {
+        state.quiz.answeredCurrent = false;
+        setFeedback('回答错误，再试一次', 'error');
+      }
     }
 
     render();
@@ -564,6 +716,7 @@ function finishQuiz() {
   state.quiz.started = false;
   state.quiz.ended = true;
   state.quiz.currentQuestion = null;
+  state.quiz.currentWrongAttempts = 0;
   state.quiz.answeredCurrent = false;
   state.quiz.reviewMode = false;
   state.quiz.reviewQueue = [];
@@ -588,10 +741,38 @@ function showLibraryPanel() {
   render();
 }
 
+function goToLibraryFromNotice() {
+  const english = state.wordForm.english.trim().toLowerCase();
+
+  if (state.notice?.action !== 'library') {
+    return;
+  }
+
+  state.activePanel = 'library';
+  state.libraryEditingId = null;
+  state.librarySearch = english;
+  setNotice(null);
+  render();
+}
+
 function toggleLibraryErrorSort() {
   state.librarySort = state.librarySort === 'frequent-errors' ? 'default' : 'frequent-errors';
   state.libraryEditingId = null;
   render();
+}
+
+function handleLibrarySearchInput(event) {
+  state.librarySearch = event.currentTarget.value;
+  state.libraryEditingId = null;
+  render();
+
+  const searchInput = document.querySelector('#library-search');
+
+  if (searchInput) {
+    const position = state.librarySearch.length;
+    searchInput.focus();
+    searchInput.setSelectionRange(position, position);
+  }
 }
 
 async function handleWordEditSubmit(event) {
@@ -664,8 +845,10 @@ function bindEvents() {
   document.querySelector('#start-test-button')?.addEventListener('click', showQuizPanel);
   document.querySelector('#add-word-button')?.addEventListener('click', showAddPanel);
   document.querySelector('#view-library-button')?.addEventListener('click', showLibraryPanel);
+  document.querySelector('#notice-action-button')?.addEventListener('click', goToLibraryFromNotice);
   document.querySelector('#library-add-button')?.addEventListener('click', showAddPanel);
   document.querySelector('#library-test-button')?.addEventListener('click', showQuizPanel);
+  document.querySelector('#library-search')?.addEventListener('input', handleLibrarySearchInput);
   document.querySelector('#library-error-sort-button')?.addEventListener('click', toggleLibraryErrorSort);
   document.querySelectorAll('.edit-word-button').forEach((button) => {
     button.addEventListener('click', () => {

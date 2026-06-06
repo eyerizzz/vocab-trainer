@@ -148,7 +148,8 @@ label span {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 44px;
   border: 1px solid var(--line);
@@ -160,9 +161,18 @@ select {
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+textarea {
+  min-height: 96px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  resize: vertical;
+  line-height: 1.45;
 }
 
 .lookup-status {
@@ -236,6 +246,79 @@ select:focus {
   color: var(--accent-dark);
 }
 
+.part-choice-group {
+  min-width: 0;
+  margin: 0;
+  border: 0;
+  padding: 0;
+}
+
+.part-choice-group legend {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.part-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 112px);
+  grid-auto-rows: 40px;
+  gap: 8px;
+}
+
+.part-choice {
+  position: relative;
+  display: block;
+}
+
+.part-choice input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.part-choice span {
+  display: grid;
+  place-items: center;
+  height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--text);
+  background: #fbfcfb;
+  font-size: 16px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.part-choice input:checked + span {
+  color: var(--accent-dark);
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.part-choice input:focus + span {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.word-form-footer {
+  display: grid;
+  grid-template-columns: max-content 416px;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: start;
+}
+
+.word-save-button {
+  align-self: start;
+  width: 100%;
+  height: 88px;
+  margin-top: calc(13px * 1.35 + 7px);
+  font-size: 18px;
+}
+
 .primary-button,
 .secondary-button,
 .ghost-button {
@@ -270,6 +353,18 @@ select:focus {
   color: var(--text);
   border-color: var(--line);
   background: #fff;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 .collapsed-feature-panel {
@@ -330,9 +425,22 @@ select:focus {
   min-width: 0;
 }
 
+.library-word-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 10px;
+}
+
 .library-word-main strong {
   font-size: 18px;
   overflow-wrap: anywhere;
+}
+
+.library-error-stats {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .meaning-badges {
@@ -370,6 +478,44 @@ select:focus {
   color: var(--accent-dark);
   border-color: var(--accent);
   background: var(--accent-soft);
+}
+
+.library-search-control {
+  display: block;
+  min-width: 0;
+}
+
+.library-search-control input {
+  min-height: 36px;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.library-toolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) max-content;
+  align-items: center;
+  width: min(100%, 920px);
+  gap: 10px 12px;
+}
+
+.library-panel .panel-header {
+  display: grid;
+  grid-template-columns: 1fr;
+  align-items: start;
+}
+
+.library-toolbar-actions {
+  display: grid;
+  grid-template-columns: repeat(3, max-content);
+  gap: 8px;
+}
+
+.library-toolbar-actions .ghost-button {
+  min-height: 44px;
+  min-width: 112px;
+  padding: 0 14px;
+  white-space: nowrap;
 }
 
 .word-edit-form {
@@ -569,6 +715,25 @@ select:focus {
   background: #fff;
 }
 
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notice-action {
+  flex: 0 0 auto;
+  min-height: 34px;
+  border: 1px solid currentColor;
+  border-radius: 7px;
+  padding: 0 12px;
+  color: inherit;
+  background: transparent;
+  font-weight: 800;
+  cursor: pointer;
+}
+
 .feedback-success,
 .notice-success {
   color: var(--success);
@@ -669,6 +834,19 @@ select:focus {
     gap: 6px;
   }
 
+  .library-toolbar {
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .library-toolbar-actions {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .library-toolbar-actions .ghost-button {
+    min-width: 0;
+  }
+
   .workspace {
     grid-template-columns: 1fr;
   }
@@ -689,12 +867,31 @@ select:focus {
   .word-row,
   .library-row,
   .meaning-edit-row,
+  .word-form-footer,
   .feature-entry-grid {
     grid-template-columns: 1fr;
   }
 
   .stats-grid {
     gap: 8px;
+  }
+
+  .part-choice-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .word-save-button {
+    height: 52px;
+    margin-top: 0;
+  }
+
+  .part-choice-group,
+  .part-choice-grid {
+    width: 100%;
+  }
+
+  .library-toolbar-actions {
+    grid-template-columns: 1fr;
   }
 
   .stat-tile {

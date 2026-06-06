@@ -55,20 +55,31 @@ export const api = {
     });
   },
 
-  async getRandomQuestion({ mode, range, days }) {
+  async getRandomQuestion({ mode, range, days, excludeWordIds = [] }) {
     const params = new URLSearchParams({ mode, range });
 
     if (range === 'recent') {
       params.set('days', String(days));
     }
 
+    if (excludeWordIds.length > 0) {
+      params.set('excludeWordIds', excludeWordIds.join(','));
+    }
+
     return request(`/api/quiz/random?${params.toString()}`);
   },
 
-  async checkAnswer({ wordId, meaningId, mode, answer }) {
+  async checkAnswer({ wordId, meaningId, mode, answer, recordError }) {
     return request('/api/quiz/check', {
       method: 'POST',
-      body: JSON.stringify({ wordId, meaningId, mode, answer })
+      body: JSON.stringify({ wordId, meaningId, mode, answer, recordError })
+    });
+  },
+
+  async markWrong({ wordId, meaningId, reason }) {
+    return request('/api/quiz/wrong', {
+      method: 'POST',
+      body: JSON.stringify({ wordId, meaningId, reason })
     });
   }
 };

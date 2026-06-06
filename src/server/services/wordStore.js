@@ -53,17 +53,26 @@ function normalizeEnglish(value) {
 function normalizeMeaningInput(input) {
   const partOfSpeech = cleanText(input.partOfSpeech);
   const chinese = cleanText(input.chinese);
-  const errorCount = Number(input.errorCount || 0);
+  const legacyErrorCount = Number(input.errorCount || 0);
+  const spellingErrorCount = Number(input.spellingErrorCount ?? legacyErrorCount);
+  const skipCount = Number(input.skipCount || 0);
 
   if (!chinese) {
     throw new Error('请输入中文释义');
   }
 
+  const normalizedSpellingErrorCount = Number.isFinite(spellingErrorCount) && spellingErrorCount > 0
+    ? Math.floor(spellingErrorCount)
+    : 0;
+  const normalizedSkipCount = Number.isFinite(skipCount) && skipCount > 0 ? Math.floor(skipCount) : 0;
+
   return {
     id: cleanText(input.id) || createMeaningId(),
     partOfSpeech: normalizePartOfSpeech(partOfSpeech),
     chinese,
-    errorCount: Number.isFinite(errorCount) && errorCount > 0 ? Math.floor(errorCount) : 0
+    spellingErrorCount: normalizedSpellingErrorCount,
+    skipCount: normalizedSkipCount,
+    errorCount: normalizedSpellingErrorCount + normalizedSkipCount
   };
 }
 
@@ -277,7 +286,7 @@ export function createWordStore(wordsFile = defaultWordsFile) {
     return word;
   }
 
-  async function incrementMeaningError(wordId, meaningId) {
+  async function incrementMeaningError(wordId, meaningId, reason = 'spelling') {
     const words = await getWords();
     const word = words.find((item) => item.id === cleanText(wordId));
 
@@ -291,7 +300,13 @@ export function createWordStore(wordsFile = defaultWordsFile) {
       throw new Error('题目不存在');
     }
 
-    meaning.errorCount = Number(meaning.errorCount || 0) + 1;
+    if (reason === 'skipped') {
+      meaning.skipCount = Number(meaning.skipCount || 0) + 1;
+    } else {
+      meaning.spellingErrorCount = Number(meaning.spellingErrorCount || 0) + 1;
+    }
+
+    meaning.errorCount = Number(meaning.spellingErrorCount || 0) + Number(meaning.skipCount || 0);
     word.updatedAt = new Date().toISOString();
     await saveWords(words);
     return { word, meaning };

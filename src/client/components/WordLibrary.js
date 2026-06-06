@@ -26,8 +26,43 @@ function getWordErrorCount(word) {
   }, 0);
 }
 
+function getWordErrorStats(word) {
+  return getMeanings(word).reduce((stats, meaning) => {
+    const legacyErrorCount = Number(meaning.errorCount || 0);
+    const spellingErrorCount = Number(meaning.spellingErrorCount ?? legacyErrorCount);
+    const skipCount = Number(meaning.skipCount || 0);
+
+    stats.spellingErrorCount += Number.isFinite(spellingErrorCount) && spellingErrorCount > 0
+      ? Math.floor(spellingErrorCount)
+      : 0;
+    stats.skipCount += Number.isFinite(skipCount) && skipCount > 0 ? Math.floor(skipCount) : 0;
+    return stats;
+  }, { spellingErrorCount: 0, skipCount: 0 });
+}
+
+function normalizeSearchQuery(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function wordMatchesSearch(word, query) {
+  if (!query) {
+    return true;
+  }
+
+  return word.english.toLowerCase().startsWith(query)
+    || getMeanings(word).some((meaning) => meaning.chinese.toLowerCase().includes(query));
+}
+
+function filterWords(words, searchQuery) {
+  const query = normalizeSearchQuery(searchQuery);
+  return words.filter((word) => wordMatchesSearch(word, query));
+}
+
 function sortWords(words, sortMode) {
-  const indexedWords = words.map((word, index) => ({ word, index }));
+  const activeWords = sortMode === 'frequent-errors'
+    ? words.filter((word) => getWordErrorCount(word) > 0)
+    : words;
+  const indexedWords = activeWords.map((word, index) => ({ word, index }));
 
   if (sortMode === 'frequent-errors') {
     indexedWords.sort((left, right) => {
@@ -42,6 +77,24 @@ function sortWords(words, sortMode) {
   }
 
   return indexedWords.map((item) => item.word);
+}
+
+function renderSearchSuggestions(words, searchQuery) {
+  const query = normalizeSearchQuery(searchQuery);
+
+  if (!query || /[^\w-]/.test(query)) {
+    return '';
+  }
+
+  const suggestions = [...new Set(
+    words
+      .map((word) => word.english)
+      .filter((english) => english.toLowerCase().startsWith(query))
+  )].slice(0, 8);
+
+  return suggestions.map((english) => `
+    <option value="${escapeHtml(english)}"></option>
+  `).join('');
 }
 
 function renderMeaningBadges(word) {
@@ -67,7 +120,17 @@ function renderMeaningEditRows(word) {
   `).join('');
 }
 
-function renderWordCard(word, editingWordId) {
+function renderErrorStats(word) {
+  const stats = getWordErrorStats(word);
+
+  return `
+    <span class="library-error-stats">
+      拼写错误 ${stats.spellingErrorCount} 次 · 跳过 ${stats.skipCount} 次
+    </span>
+  `;
+}
+
+function renderWordCard(word, editingWordId, options = {}) {
   const isEditing = word.id === editingWordId;
 
   if (isEditing) {
@@ -96,7 +159,10 @@ function renderWordCard(word, editingWordId) {
   return `
     <li class="library-row">
       <div class="library-word-main">
-        <strong>${escapeHtml(word.english)}</strong>
+        <div class="library-word-title">
+          <strong>${escapeHtml(word.english)}</strong>
+          ${options.showErrorStats ? renderErrorStats(word) : ''}
+        </div>
         <div class="meaning-badges">${renderMeaningBadges(word)}</div>
       </div>
       <div class="library-actions">
@@ -107,34 +173,51 @@ function renderWordCard(word, editingWordId) {
   `;
 }
 
-export function renderWordLibrary(words, editingWordId, sortMode = 'default') {
-  const sortedWords = sortWords(words, sortMode);
+export function renderWordLibrary(words, editingWordId, sortMode = 'default', searchQuery = '') {
+  const filteredWords = filterWords(words, searchQuery);
+  const sortedWords = sortWords(filteredWords, sortMode);
+  const emptyMessage = sortMode === 'frequent-errors'
+    ? '还没有经常出错的单词。'
+    : searchQuery ? '没有匹配的单词。' : '还没有单词。';
   const rows = sortedWords.length
-    ? sortedWords.map((word) => renderWordCard(word, editingWordId)).join('')
-    : '<li class="empty-row">还没有单词。</li>';
+    ? sortedWords
+        .map((word) => renderWordCard(word, editingWordId, {
+          showErrorStats: sortMode === 'frequent-errors'
+        }))
+        .join('')
+    : `<li class="empty-row">${emptyMessage}</li>`;
 
   return `
     <section class="panel library-panel" aria-labelledby="library-title">
       <div class="panel-header">
         <div>
-          <p class="eyebrow">词库</p>
-          <h2 id="library-title">全部单词</h2>
+          <h2 id="library-title">已添加单词</h2>
         </div>
-        <div class="panel-actions">
-          <button
-            id="library-error-sort-button"
-            class="ghost-button ${sortMode === 'frequent-errors' ? 'is-active' : ''}"
-            type="button"
-            aria-pressed="${sortMode === 'frequent-errors'}"
-          >经常出错</button>
-          <button id="library-add-button" class="ghost-button" type="button">
-            <span aria-hidden="true">+</span>
-            <span>添加单词</span>
-          </button>
-          <button id="library-test-button" class="ghost-button" type="button">
-            <span aria-hidden="true">?</span>
-            <span>开始测试</span>
-          </button>
+        <div class="panel-actions library-toolbar">
+          <label class="library-search-control">
+            <span class="visually-hidden">搜索词库</span>
+            <input
+              id="library-search"
+              type="search"
+              list="library-search-suggestions"
+              autocomplete="off"
+              placeholder="搜索英文或中文释义"
+              value="${escapeHtml(searchQuery)}"
+            />
+            <datalist id="library-search-suggestions">
+              ${renderSearchSuggestions(words, searchQuery)}
+            </datalist>
+          </label>
+          <div class="library-toolbar-actions">
+            <button
+              id="library-error-sort-button"
+              class="ghost-button ${sortMode === 'frequent-errors' ? 'is-active' : ''}"
+              type="button"
+              aria-pressed="${sortMode === 'frequent-errors'}"
+            >经常出错</button>
+            <button id="library-add-button" class="ghost-button" type="button">添加单词</button>
+            <button id="library-test-button" class="ghost-button" type="button">开始测试</button>
+          </div>
         </div>
       </div>
       <ul class="library-list">${rows}</ul>

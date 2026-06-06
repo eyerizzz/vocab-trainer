@@ -3,10 +3,12 @@ export const initialQuizState = {
   range: 'all',
   days: 7,
   currentQuestion: null,
+  currentWrongAttempts: 0,
   answeredCurrent: false,
   started: false,
   ended: false,
   reviewMode: false,
+  seenWordIds: [],
   wrongQuestions: [],
   reviewQueue: [],
   total: 0,
@@ -16,6 +18,7 @@ export const initialQuizState = {
 export function createQuizState() {
   return {
     ...initialQuizState,
+    seenWordIds: [],
     wrongQuestions: [],
     reviewQueue: []
   };
@@ -23,24 +26,42 @@ export function createQuizState() {
 
 export function resetQuizProgress(quizState) {
   quizState.currentQuestion = null;
+  quizState.currentWrongAttempts = 0;
   quizState.answeredCurrent = false;
   quizState.started = false;
   quizState.ended = false;
   quizState.reviewMode = false;
+  quizState.seenWordIds = [];
   quizState.wrongQuestions = [];
   quizState.reviewQueue = [];
   quizState.total = 0;
   quizState.correct = 0;
 }
 
+function getQuestionKey(question) {
+  return `${question.wordId}|${question.meaningId}|${question.mode}`;
+}
+
+export function hasWrongQuestion(quizState, question) {
+  const key = getQuestionKey(question);
+  return quizState.wrongQuestions.some((wrongItem) => getQuestionKey(wrongItem.question) === key);
+}
+
 export function recordWrongQuestion(quizState, item) {
-  const key = `${item.question.wordId}|${item.question.meaningId}|${item.question.mode}`;
-  const exists = quizState.wrongQuestions.some((wrongItem) => (
-    `${wrongItem.question.wordId}|${wrongItem.question.meaningId}|${wrongItem.question.mode}` === key
-  ));
+  const exists = hasWrongQuestion(quizState, item.question);
 
   if (!exists) {
     quizState.wrongQuestions.push(item);
+  }
+
+  return !exists;
+}
+
+export function recordSeenWord(quizState, wordId) {
+  const cleanedWordId = String(wordId || '').trim();
+
+  if (cleanedWordId && !quizState.seenWordIds.includes(cleanedWordId)) {
+    quizState.seenWordIds.push(cleanedWordId);
   }
 }
 
@@ -50,6 +71,7 @@ export function startWrongQuestionReview(quizState) {
   quizState.started = true;
   quizState.reviewQueue = quizState.wrongQuestions.map((item) => item.question);
   quizState.currentQuestion = null;
+  quizState.currentWrongAttempts = 0;
   quizState.answeredCurrent = false;
 }
 

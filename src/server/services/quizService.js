@@ -136,12 +136,24 @@ export function pickRandomQuestion(words, options = {}, rng = Math.random, now =
   const mode = options.mode || 'zh-to-en';
   assertMode(mode);
 
-  const pool = filterWordsByRange(words, options, now);
+  const rangePool = filterWordsByRange(words, options, now);
+
+  if (rangePool.length === 0) {
+    return {
+      empty: true,
+      message: '当前范围没有可测试单词'
+    };
+  }
+
+  const excludeWordIds = new Set(Array.isArray(options.excludeWordIds) ? options.excludeWordIds : []);
+  const pool = rangePool.filter((word) => !excludeWordIds.has(word.id));
 
   if (pool.length === 0) {
     return {
       empty: true,
-      message: '当前范围没有可测试单词'
+      exhausted: true,
+      message: '本轮题目已完成',
+      poolSize: rangePool.length
     };
   }
 

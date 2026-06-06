@@ -137,7 +137,31 @@ test('increments cumulative error count for a meaning', async () => {
     const words = await store.getWords();
 
     assert.equal(result.meaning.errorCount, 2);
+    assert.equal(result.meaning.spellingErrorCount, 2);
+    assert.equal(result.meaning.skipCount, 0);
     assert.equal(words[0].meanings[0].errorCount, 2);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('tracks spelling errors and skips separately', async () => {
+  const { directory, store } = await createTempStore();
+
+  try {
+    const word = await store.addWord({
+      english: 'apple',
+      chinese: '苹果',
+      partOfSpeech: 'noun'
+    });
+    const meaningId = word.meanings[0].id;
+
+    await store.incrementMeaningError(word.id, meaningId, 'spelling');
+    const result = await store.incrementMeaningError(word.id, meaningId, 'skipped');
+
+    assert.equal(result.meaning.spellingErrorCount, 1);
+    assert.equal(result.meaning.skipCount, 1);
+    assert.equal(result.meaning.errorCount, 2);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
