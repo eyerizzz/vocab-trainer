@@ -437,6 +437,12 @@ textarea {
   overflow-wrap: anywhere;
 }
 
+.library-phonetic {
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
 .library-error-stats {
   color: var(--muted);
   font-size: 13px;
@@ -491,7 +497,13 @@ textarea {
   min-width: 0;
 }
 
-.library-search-control input {
+.library-filter-control {
+  display: block;
+  min-width: 0;
+}
+
+.library-search-control input,
+.library-filter-control select {
   min-height: 36px;
   border-radius: 7px;
   background: #fff;
@@ -499,9 +511,9 @@ textarea {
 
 .library-toolbar {
   display: grid;
-  grid-template-columns: minmax(260px, 1fr) max-content;
+  grid-template-columns: 150px minmax(220px, 320px) max-content;
   align-items: center;
-  width: min(100%, 920px);
+  width: 100%;
   gap: 10px 12px;
 }
 
@@ -666,6 +678,13 @@ textarea {
   font-size: clamp(22px, 3vw, 32px);
   font-weight: 900;
   line-height: 1.35;
+}
+
+.question-pos-list {
+  display: inline-flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .question-pos {

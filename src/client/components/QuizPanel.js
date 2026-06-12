@@ -50,6 +50,30 @@ function getQuestionMeaning(question, words = []) {
   return meanings.find((meaning) => meaning.id === question.meaningId) || null;
 }
 
+function getQuestionMeanings(question, words = []) {
+  const word = words.find((item) => item.id === question.wordId);
+  const meanings = Array.isArray(word?.meanings) ? word.meanings : [];
+
+  if (meanings.length > 0) {
+    return meanings;
+  }
+
+  return [{
+    partOfSpeech: question.partOfSpeech
+  }];
+}
+
+function renderQuestionPartOfSpeeches(question, words = []) {
+  const labels = [...new Set(getQuestionMeanings(question, words)
+    .map((meaning) => PART_OF_SPEECH_LABELS[meaning.partOfSpeech] || 'other'))];
+
+  return `
+    <span class="question-pos-list" aria-label="词性">
+      ${labels.map((label) => `<span class="question-pos">${escapeHtml(label)}</span>`).join('')}
+    </span>
+  `;
+}
+
 function renderCurrentQuestion(quizState, words = []) {
   const question = quizState.currentQuestion;
 
@@ -66,7 +90,7 @@ function renderCurrentQuestion(quizState, words = []) {
   return `
     <div class="question-box">
       <p class="question-prompt">
-        <span class="question-pos">${escapeHtml(PART_OF_SPEECH_LABELS[question.partOfSpeech] || 'other')}</span>
+        ${renderQuestionPartOfSpeeches(question, words)}
         <span>${escapeHtml(question.prompt)}</span>
       </p>
       <button
@@ -142,6 +166,9 @@ export function renderQuizPanel(quizState, feedback, options = {}) {
       </button>
     `
     : '';
+  const libraryButton = options.showLibraryButton
+    ? '<button id="quiz-library-button" class="ghost-button" type="button">查看词库</button>'
+    : '';
 
   return `
     <section class="panel quiz-panel" aria-labelledby="quiz-title">
@@ -151,6 +178,7 @@ export function renderQuizPanel(quizState, feedback, options = {}) {
           <h2 id="quiz-title">随机抽题</h2>
         </div>
         <div class="panel-actions">
+          ${libraryButton}
           ${addWordButton}
           <button id="reset-quiz-button" class="ghost-button" type="button" title="重新开始">
             <span aria-hidden="true">↻</span>

@@ -28,7 +28,7 @@ export async function handleQuizRoute(request, response, url) {
       .map((value) => value.trim())
       .filter(Boolean);
     const words = await getWords();
-    const result = pickRandomQuestion(words, { mode, range, days, excludeWordIds });
+    const result = pickRandomQuestion(words, { mode, range, days, excludeWordIds, shuffle: true });
 
     sendJson(response, 200, result);
     return;

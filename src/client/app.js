@@ -22,6 +22,7 @@ const state = {
   libraryEditingId: null,
   librarySort: 'default',
   librarySearch: '',
+  libraryDateFilter: 'all',
   quiz: createQuizState(),
   wordForm: {
     english: '',
@@ -31,6 +32,7 @@ const state = {
   wordLookup: {
     english: '',
     status: 'idle',
+    phonetic: '',
     candidates: [],
     selectedKeys: []
   },
@@ -159,11 +161,21 @@ function renderFeatureEntrypoints() {
 
 function renderActiveFeature() {
   if (state.activePanel === 'quiz') {
-    return renderQuizPanel(state.quiz, state.feedback, { showAddWordButton: true, words: state.words });
+    return renderQuizPanel(state.quiz, state.feedback, {
+      showLibraryButton: true,
+      showAddWordButton: true,
+      words: state.words
+    });
   }
 
   if (state.activePanel === 'library') {
-    return renderWordLibrary(state.words, state.libraryEditingId, state.librarySort, state.librarySearch);
+    return renderWordLibrary(
+      state.words,
+      state.libraryEditingId,
+      state.librarySort,
+      state.librarySearch,
+      state.libraryDateFilter
+    );
   }
 
   return `
@@ -351,6 +363,10 @@ async function handleWordSubmit(event) {
   const chinese = String(formData.get('chinese') || '').trim();
   const partOfSpeeches = getSelectedPartOfSpeeches(formData);
   const meanings = parseMeaningLines(english, chinese, partOfSpeeches);
+  const phonetic = state.wordLookup.english === english.toLowerCase()
+    ? state.wordLookup.phonetic
+    : '';
+  const wordInputs = meanings.map((meaning) => ({ ...meaning, phonetic }));
 
   state.wordForm = {
     english,
@@ -378,11 +394,12 @@ async function handleWordSubmit(event) {
 
   try {
     const result = meanings.length > 1
-      ? await api.addWords(meanings)
+      ? await api.addWords(wordInputs)
       : await api.addWord({
-          english: meanings[0]?.english || state.wordForm.english,
-          chinese: meanings[0]?.chinese || state.wordForm.chinese,
-          partOfSpeech: meanings[0]?.partOfSpeech || state.wordForm.partOfSpeech[0]
+          english: wordInputs[0]?.english || state.wordForm.english,
+          chinese: wordInputs[0]?.chinese || state.wordForm.chinese,
+          partOfSpeech: wordInputs[0]?.partOfSpeech || state.wordForm.partOfSpeech[0],
+          phonetic
         });
 
     const savedCount = result.savedCount || result.words?.length || 1;
@@ -390,7 +407,7 @@ async function handleWordSubmit(event) {
     lookupTimer = null;
     lookupRequestId += 1;
     state.wordForm = { english: '', chinese: '', partOfSpeech: [] };
-    state.wordLookup = { english: '', status: 'idle', candidates: [], selectedKeys: [] };
+    state.wordLookup = { english: '', status: 'idle', phonetic: '', candidates: [], selectedKeys: [] };
     setNotice(savedCount > 1 ? `已保存 ${savedCount} 条释义` : '单词已保存', 'success', {
       autoDismissMs: 1800
     });
@@ -416,7 +433,7 @@ async function lookupWord(english, requestId) {
   const query = english.trim().toLowerCase();
 
   if (!query) {
-    state.wordLookup = { english: '', status: 'idle', candidates: [], selectedKeys: [] };
+    state.wordLookup = { english: '', status: 'idle', phonetic: '', candidates: [], selectedKeys: [] };
     render();
     return;
   }
@@ -424,6 +441,7 @@ async function lookupWord(english, requestId) {
   state.wordLookup = {
     english: query,
     status: 'loading',
+    phonetic: '',
     candidates: [],
     selectedKeys: []
   };
@@ -439,6 +457,7 @@ async function lookupWord(english, requestId) {
     state.wordLookup = {
       english: result.english,
       status: result.candidates.length ? 'ready' : 'empty',
+      phonetic: result.phonetic || result.candidates.find((candidate) => candidate.phonetic)?.phonetic || '',
       candidates: result.candidates,
       selectedKeys: []
     };
@@ -453,6 +472,7 @@ async function lookupWord(english, requestId) {
     state.wordLookup = {
       english: query,
       status: error.status === 404 ? 'server-error' : 'error',
+      phonetic: '',
       candidates: [],
       selectedKeys: []
     };
@@ -778,6 +798,12 @@ function handleLibrarySearchInput(event) {
   }
 }
 
+function handleLibraryDateFilterChange(event) {
+  state.libraryDateFilter = event.currentTarget.value;
+  state.libraryEditingId = null;
+  render();
+}
+
 async function handleWordEditSubmit(event) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -853,11 +879,13 @@ function bindEvents() {
   });
   document.querySelector('#start-test-button')?.addEventListener('click', showQuizPanel);
   document.querySelector('#add-word-button')?.addEventListener('click', showAddPanel);
+  document.querySelector('#quiz-library-button')?.addEventListener('click', showLibraryPanel);
   document.querySelector('#view-library-button')?.addEventListener('click', showLibraryPanel);
   document.querySelector('#notice-action-button')?.addEventListener('click', goToLibraryFromNotice);
   document.querySelector('#library-add-button')?.addEventListener('click', showAddPanel);
   document.querySelector('#library-test-button')?.addEventListener('click', showQuizPanel);
   document.querySelector('#library-search')?.addEventListener('input', handleLibrarySearchInput);
+  document.querySelector('#library-date-filter')?.addEventListener('change', handleLibraryDateFilterChange);
   document.querySelector('#library-error-sort-button')?.addEventListener('click', toggleLibraryErrorSort);
   document.querySelectorAll('.edit-word-button').forEach((button) => {
     button.addEventListener('click', () => {

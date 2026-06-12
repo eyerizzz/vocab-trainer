@@ -20,13 +20,15 @@ test('adds a word with english, meanings, and timestamps', async () => {
     const word = await store.addWord({
       english: ' apple ',
       chinese: ' 苹果 ',
-      partOfSpeech: 'noun'
+      partOfSpeech: 'noun',
+      phonetic: '/ˈæpəl/'
     });
 
     const saved = JSON.parse(await readFile(wordsFile, 'utf8'));
 
     assert.equal(saved.length, 1);
     assert.equal(saved[0].english, 'apple');
+    assert.equal(saved[0].phonetic, 'ˈæpəl');
     assert.equal(saved[0].meanings.length, 1);
     assert.equal(saved[0].meanings[0].chinese, '苹果');
     assert.equal(saved[0].meanings[0].partOfSpeech, 'noun');
@@ -34,6 +36,32 @@ test('adds a word with english, meanings, and timestamps', async () => {
     assert.match(saved[0].meanings[0].id, /^meaning_/);
     assert.ok(Number.isFinite(new Date(saved[0].createdAt).getTime()));
     assert.deepEqual(saved[0], word);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
+
+test('keeps a word phonetic when merging more meanings', async () => {
+  const { directory, store } = await createTempStore();
+
+  try {
+    await store.addWord({
+      english: 'record',
+      chinese: '记录',
+      partOfSpeech: 'noun',
+      phonetic: 'ˈrekɔːrd'
+    });
+    await store.addWord({
+      english: 'record',
+      chinese: '记录；录制',
+      partOfSpeech: 'verb'
+    });
+
+    const words = await store.getWords();
+
+    assert.equal(words.length, 1);
+    assert.equal(words[0].phonetic, 'ˈrekɔːrd');
+    assert.equal(words[0].meanings.length, 2);
   } finally {
     await rm(directory, { recursive: true, force: true });
   }

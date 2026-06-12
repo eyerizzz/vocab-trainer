@@ -96,6 +96,18 @@ test('keeps random selection inside the available pool', () => {
   assert.equal(last.poolSize, 4);
 });
 
+test('can shuffle candidates before picking a random question', () => {
+  const orderedWords = words.slice(0, 3);
+  const result = pickRandomQuestion(
+    orderedWords,
+    { mode: 'en-to-zh', range: 'all', shuffle: true },
+    () => 0,
+    fixedNow
+  );
+
+  assert.equal(result.question.wordId, 'word_week');
+});
+
 test('excludes words already seen in the current round', () => {
   const result = pickRandomQuestion(
     words,

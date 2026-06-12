@@ -72,6 +72,23 @@ test('shows wrong questions and completes one wrong-question review', () => {
   assert.deepEqual(quizState.reviewQueue, []);
 });
 
+test('shuffles wrong-question review queue before redo', () => {
+  const quizState = createQuizState();
+  const questions = ['one', 'two', 'three'].map((wordId) => ({
+    wordId,
+    meaningId: `${wordId}_meaning`,
+    mode: 'zh-to-en',
+    prompt: wordId
+  }));
+
+  questions.forEach((question) => {
+    recordWrongQuestion(quizState, { question });
+  });
+  startWrongQuestionReview(quizState, () => 0);
+
+  assert.deepEqual(quizState.reviewQueue.map((question) => question.wordId), ['two', 'three', 'one']);
+});
+
 test('records seen words once per round', () => {
   const quizState = createQuizState();
 

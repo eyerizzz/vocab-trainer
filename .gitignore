@@ -3,3 +3,6 @@ dist/
 *.log
 .DS_Store
 data/words.json
+
+.DS_Store
+data/words.before-*.json

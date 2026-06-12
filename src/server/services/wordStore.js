@@ -52,6 +52,10 @@ function normalizeEnglish(value) {
   return english;
 }
 
+function normalizePhonetic(value) {
+  return cleanText(value).replace(/^\/|\/$/g, '');
+}
+
 function normalizeMeaningInput(input) {
   const partOfSpeech = cleanText(input.partOfSpeech);
   const chinese = cleanText(input.chinese);
@@ -81,7 +85,8 @@ function normalizeMeaningInput(input) {
 function normalizeWordInput(input) {
   return {
     english: normalizeEnglish(input.english),
-    meaning: normalizeMeaningInput(input)
+    meaning: normalizeMeaningInput(input),
+    phonetic: normalizePhonetic(input.phonetic)
   };
 }
 
@@ -126,6 +131,7 @@ function normalizeStoredWord(rawWord) {
   return {
     id: cleanText(rawWord.id) || createWordId(),
     english,
+    phonetic: normalizePhonetic(rawWord.phonetic),
     meanings,
     createdAt: cleanText(rawWord.createdAt) || new Date().toISOString(),
     updatedAt: cleanText(rawWord.updatedAt) || cleanText(rawWord.createdAt) || new Date().toISOString()
@@ -189,12 +195,13 @@ export function createWordStore(wordsFile = defaultWordsFile) {
   }
 
   async function addWord(input) {
-    const { english, meaning } = normalizeWordInput(input);
+    const { english, meaning, phonetic } = normalizeWordInput(input);
     const words = await getWords();
     const existing = findWordByEnglish(words, english);
 
     if (existing) {
       existing.meanings = mergeMeanings(existing.meanings, [meaning]);
+      existing.phonetic ||= phonetic;
       existing.updatedAt = new Date().toISOString();
       await saveWords(words);
       return existing;
@@ -203,6 +210,7 @@ export function createWordStore(wordsFile = defaultWordsFile) {
     const word = {
       id: createWordId(),
       english,
+      phonetic,
       meanings: [meaning],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -223,12 +231,13 @@ export function createWordStore(wordsFile = defaultWordsFile) {
     const affectedWordIds = new Set();
     let savedCount = 0;
 
-    for (const { english, meaning } of normalizedInputs) {
+    for (const { english, meaning, phonetic } of normalizedInputs) {
       const existing = findWordByEnglish(words, english);
 
       if (existing) {
         const before = existing.meanings.length;
         existing.meanings = mergeMeanings(existing.meanings, [meaning]);
+        existing.phonetic ||= phonetic;
         existing.updatedAt = new Date().toISOString();
         savedCount += existing.meanings.length > before ? 1 : 0;
         affectedWordIds.add(existing.id);
@@ -238,6 +247,7 @@ export function createWordStore(wordsFile = defaultWordsFile) {
       const word = {
         id: createWordId(),
         english,
+        phonetic,
         meanings: [meaning],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()

@@ -32,6 +32,10 @@ function cleanText(value) {
     .trim();
 }
 
+function cleanPhonetic(value) {
+  return cleanText(value).replace(/^\/|\/$/g, '');
+}
+
 function cleanDefinitionFragment(value) {
   return cleanText(value)
     .replace(/（[^）]*(?:现在分词|过去分词)[^）]*）/g, '')
@@ -117,6 +121,22 @@ function getArray(value) {
   return value == null ? [] : [value];
 }
 
+function getYoudaoPhonetic(payload) {
+  for (const word of getArray(payload?.ec?.word)) {
+    const phonetic = cleanPhonetic(word?.usphone || word?.ukphone || word?.phone);
+
+    if (phonetic) {
+      return phonetic;
+    }
+  }
+
+  return '';
+}
+
+function getSuggestPhonetic(entry) {
+  return cleanPhonetic(entry?.phone || entry?.usphone || entry?.ukphone);
+}
+
 function collectYoudaoDefinitionLines(payload) {
   const lines = [];
 
@@ -161,8 +181,10 @@ function dedupeCandidates(candidates) {
 
     if (existing) {
       existing.chinese = compactChineseDefinition(`${existing.chinese}；${chinese}`);
+      existing.phonetic ||= cleanPhonetic(candidate.phonetic);
     } else {
-      byPartOfSpeech.set(key, { english, chinese, partOfSpeech });
+      const phonetic = cleanPhonetic(candidate.phonetic);
+      byPartOfSpeech.set(key, { english, chinese, partOfSpeech, ...(phonetic ? { phonetic } : {}) });
     }
 
     if (byPartOfSpeech.size >= maxCandidates) {
@@ -175,8 +197,10 @@ function dedupeCandidates(candidates) {
 
 export function parseYoudaoLookup(payload, english) {
   const query = assertEnglishWord(english);
+  const phonetic = getYoudaoPhonetic(payload);
   const candidates = collectYoudaoDefinitionLines(payload).map((line) => ({
     english: query,
+    phonetic,
     ...splitDefinitionLine(line)
   }));
 
@@ -193,8 +217,10 @@ export function parseYoudaoSuggest(payload, english) {
     return [];
   }
 
+  const phonetic = getSuggestPhonetic(exactEntry);
   const candidates = parseExplainText(exactEntry.explain).map((line) => ({
     english: query,
+    phonetic,
     ...splitDefinitionLine(line)
   }));
 
@@ -279,6 +305,7 @@ export async function lookupWordDefinitions(english, options = {}) {
         return {
           english: query,
           candidates,
+          phonetic: candidates.find((candidate) => candidate.phonetic)?.phonetic || '',
           source: lookup.source
         };
       }
@@ -290,6 +317,7 @@ export async function lookupWordDefinitions(english, options = {}) {
   return {
     english: query,
     candidates: [],
+    phonetic: '',
     source: null
   };
 }

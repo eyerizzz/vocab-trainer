@@ -47,6 +47,17 @@ function getRandomValue(rng) {
     : 0;
 }
 
+function shuffleItems(items, rng) {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swapIndex = getRandomIndex(index + 1, rng);
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
 function getMeanings(word) {
   if (Array.isArray(word.meanings)) {
     return word.meanings;
@@ -161,7 +172,9 @@ export function pickRandomQuestion(words, options = {}, rng = Math.random, now =
     };
   }
 
-  const candidates = createQuestionCandidates(pool);
+  const candidates = options.shuffle
+    ? shuffleItems(createQuestionCandidates(pool), rng)
+    : createQuestionCandidates(pool);
   const candidate = pickWeightedCandidate(candidates, rng);
 
   return {

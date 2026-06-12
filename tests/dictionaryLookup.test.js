@@ -21,15 +21,16 @@ test('parses Youdao English-Chinese definitions into word candidates', () => {
               ]
             }
           }]
-        }]
+        }],
+        usphone: 'ˈæpəl'
       }]
     }
   };
 
   assert.deepEqual(parseYoudaoLookup(payload, 'Apple'), [
-    { english: 'apple', partOfSpeech: 'noun', chinese: '苹果；苹果树' },
-    { english: 'apple', partOfSpeech: 'verb', chinese: '申请；应用' },
-    { english: 'apple', partOfSpeech: 'adjective', chinese: '快的' }
+    { english: 'apple', partOfSpeech: 'noun', chinese: '苹果；苹果树', phonetic: 'ˈæpəl' },
+    { english: 'apple', partOfSpeech: 'verb', chinese: '申请；应用', phonetic: 'ˈæpəl' },
+    { english: 'apple', partOfSpeech: 'adjective', chinese: '快的', phonetic: 'ˈæpəl' }
   ]);
 });
 
@@ -52,14 +53,14 @@ test('parses Youdao suggestions for the exact queried word', () => {
     data: {
       entries: [
         { entry: 'runner', explain: 'n. 跑步者' },
-        { entry: 'run', explain: 'v. 跑；经营 n. 奔跑；连续的一段时间' }
+        { entry: 'run', explain: 'v. 跑；经营 n. 奔跑；连续的一段时间', phone: 'rʌn' }
       ]
     }
   };
 
   assert.deepEqual(parseYoudaoSuggest(payload, 'run'), [
-    { english: 'run', partOfSpeech: 'verb', chinese: '跑；经营' },
-    { english: 'run', partOfSpeech: 'noun', chinese: '奔跑；连续的一段时间' }
+    { english: 'run', partOfSpeech: 'verb', chinese: '跑；经营', phonetic: 'rʌn' },
+    { english: 'run', partOfSpeech: 'noun', chinese: '奔跑；连续的一段时间', phonetic: 'rʌn' }
   ]);
 });
 
@@ -89,4 +90,25 @@ test('lookup falls back to suggestion endpoint when the first provider fails', a
     { english: 'test', partOfSpeech: 'noun', chinese: '测试；试验' },
     { english: 'test', partOfSpeech: 'verb', chinese: '测试；检验' }
   ]);
+});
+
+test('returns top-level phonetic when lookup provides one', async () => {
+  const fetchImpl = async () => new Response(JSON.stringify({
+    ec: {
+      word: [{
+        usphone: 'test',
+        trs: [{
+          tr: [{
+            l: {
+              i: ['n. 测试']
+            }
+          }]
+        }]
+      }]
+    }
+  }), { status: 200 });
+
+  const result = await lookupWordDefinitions('test', { fetchImpl });
+
+  assert.equal(result.phonetic, 'test');
 });

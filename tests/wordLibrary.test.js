@@ -6,6 +6,8 @@ const words = [
   {
     id: 'word_apple',
     english: 'apple',
+    phonetic: 'ˈæpəl',
+    createdAt: new Date().toISOString(),
     meanings: [
       {
         id: 'meaning_apple',
@@ -20,6 +22,7 @@ const words = [
   {
     id: 'word_record',
     english: 'record',
+    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
     meanings: [
       {
         id: 'meaning_record',
@@ -53,6 +56,38 @@ test('renders listen button before edit and delete actions', () => {
   assert.ok(deleteIndex > -1);
   assert.ok(listenIndex < editIndex);
   assert.ok(editIndex < deleteIndex);
+});
+
+test('renders phonetic next to the English word', () => {
+  const html = renderWordLibrary(words, null, 'default', '');
+
+  assert.match(html, /apple/);
+  assert.match(html, /\/ˈæpəl\//);
+});
+
+test('filters word library by added date', () => {
+  const html = renderWordLibrary([
+    ...words,
+    {
+      id: 'word_old',
+      english: 'ancient',
+      createdAt: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000).toISOString(),
+      meanings: [
+        { id: 'meaning_old', partOfSpeech: 'adjective', chinese: '古老的' }
+      ]
+    }
+  ], null, 'default', '', 'recent-7');
+
+  assert.match(html, /apple/);
+  assert.match(html, /record/);
+  assert.doesNotMatch(html, /ancient/);
+});
+
+test('renders date filter options with selected value', () => {
+  const html = renderWordLibrary(words, null, 'default', '', 'today');
+
+  assert.match(html, /id="library-date-filter"/);
+  assert.match(html, /value="today" selected>今日添加/);
 });
 
 test('filters English search by word prefix only', () => {

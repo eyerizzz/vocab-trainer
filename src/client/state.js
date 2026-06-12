@@ -71,13 +71,28 @@ export function recordSeenWord(quizState, wordId) {
   }
 }
 
-export function startWrongQuestionReview(quizState) {
+function shuffleItems(items, rng = Math.random) {
+  const shuffled = [...items];
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomValue = Number(rng());
+    const boundedValue = Number.isFinite(randomValue)
+      ? Math.min(Math.max(randomValue, 0), 1 - Number.EPSILON)
+      : 0;
+    const swapIndex = Math.floor(boundedValue * (index + 1));
+    [shuffled[index], shuffled[swapIndex]] = [shuffled[swapIndex], shuffled[index]];
+  }
+
+  return shuffled;
+}
+
+export function startWrongQuestionReview(quizState, rng = Math.random) {
   quizState.reviewMode = true;
   quizState.ended = false;
   quizState.started = true;
   quizState.wrongQuestionsVisible = false;
   quizState.wrongReviewCompleted = false;
-  quizState.reviewQueue = quizState.wrongQuestions.map((item) => item.question);
+  quizState.reviewQueue = shuffleItems(quizState.wrongQuestions.map((item) => item.question), rng);
   quizState.currentQuestion = null;
   quizState.currentWrongAttempts = 0;
   quizState.answeredCurrent = false;

@@ -22,6 +22,7 @@
     },
     "files": [
       "package.json",
+      "data/words.json",
       "public/**/*",
       "src/**/*"
     ]

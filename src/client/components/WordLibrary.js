@@ -42,6 +42,20 @@ function normalizeSearchQuery(value) {
   return String(value || '').trim().toLowerCase();
 }
 
+function getDateFilterStart(dateFilter, now = new Date()) {
+  if (dateFilter === 'today') {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    return start;
+  }
+
+  if (dateFilter === 'recent-7') {
+    return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  }
+
+  return null;
+}
+
 function wordMatchesSearch(word, query) {
   if (!query) {
     return true;
@@ -51,9 +65,20 @@ function wordMatchesSearch(word, query) {
     || getMeanings(word).some((meaning) => meaning.chinese.toLowerCase().includes(query));
 }
 
-function filterWords(words, searchQuery) {
+function wordMatchesDateFilter(word, dateFilter) {
+  const start = getDateFilterStart(dateFilter);
+
+  if (!start) {
+    return true;
+  }
+
+  const createdAt = new Date(word.createdAt);
+  return Number.isFinite(createdAt.getTime()) && createdAt >= start;
+}
+
+function filterWords(words, searchQuery, dateFilter) {
   const query = normalizeSearchQuery(searchQuery);
-  return words.filter((word) => wordMatchesSearch(word, query));
+  return words.filter((word) => wordMatchesSearch(word, query) && wordMatchesDateFilter(word, dateFilter));
 }
 
 function sortWords(words, sortMode) {
@@ -128,6 +153,12 @@ function renderErrorStats(word) {
   `;
 }
 
+function renderPhonetic(word) {
+  const phonetic = String(word.phonetic || '').trim();
+
+  return phonetic ? `<span class="library-phonetic">/${escapeHtml(phonetic)}/</span>` : '';
+}
+
 function renderWordCard(word, editingWordId, options = {}) {
   const isEditing = word.id === editingWordId;
 
@@ -159,6 +190,7 @@ function renderWordCard(word, editingWordId, options = {}) {
       <div class="library-word-main">
         <div class="library-word-title">
           <strong>${escapeHtml(word.english)}</strong>
+          ${renderPhonetic(word)}
           ${options.showErrorStats ? renderErrorStats(word) : ''}
         </div>
         <div class="meaning-badges">${renderMeaningBadges(word)}</div>
@@ -176,8 +208,8 @@ function renderWordCard(word, editingWordId, options = {}) {
   `;
 }
 
-export function renderWordLibrary(words, editingWordId, sortMode = 'default', searchQuery = '') {
-  const filteredWords = filterWords(words, searchQuery);
+export function renderWordLibrary(words, editingWordId, sortMode = 'default', searchQuery = '', dateFilter = 'all') {
+  const filteredWords = filterWords(words, searchQuery, dateFilter);
   const sortedWords = sortWords(filteredWords, sortMode);
   const emptyMessage = sortMode === 'frequent-errors'
     ? '还没有经常出错的单词。'
@@ -197,6 +229,14 @@ export function renderWordLibrary(words, editingWordId, sortMode = 'default', se
           <h2 id="library-title">已添加单词</h2>
         </div>
         <div class="panel-actions library-toolbar">
+          <label class="library-filter-control">
+            <span class="visually-hidden">按添加时间筛选</span>
+            <select id="library-date-filter">
+              <option value="all" ${dateFilter === 'all' ? 'selected' : ''}>全部单词</option>
+              <option value="today" ${dateFilter === 'today' ? 'selected' : ''}>今日添加</option>
+              <option value="recent-7" ${dateFilter === 'recent-7' ? 'selected' : ''}>近 7 日添加</option>
+            </select>
+          </label>
           <label class="library-search-control">
             <span class="visually-hidden">搜索词库</span>
             <input
