@@ -44,6 +44,12 @@ function getQuestionEnglish(question, words = []) {
   return word?.english || '';
 }
 
+function getQuestionMeaning(question, words = []) {
+  const word = words.find((item) => item.id === question.wordId);
+  const meanings = Array.isArray(word?.meanings) ? word.meanings : [];
+  return meanings.find((meaning) => meaning.id === question.meaningId) || null;
+}
+
 function renderCurrentQuestion(quizState, words = []) {
   const question = quizState.currentQuestion;
 
@@ -73,18 +79,51 @@ function renderCurrentQuestion(quizState, words = []) {
   `;
 }
 
-function renderWrongQuestionReview(quizState) {
-  if (!quizState.ended || quizState.wrongQuestions.length === 0) {
+function renderWrongQuestionRows(quizState, words = []) {
+  if (!quizState.wrongQuestionsVisible) {
     return '';
   }
 
+  const rows = quizState.wrongQuestions.map((item) => {
+    const question = item.question;
+    const english = getQuestionEnglish(question, words) || question.prompt;
+    const meaning = getQuestionMeaning(question, words);
+    const partOfSpeech = meaning?.partOfSpeech || question.partOfSpeech;
+    const chinese = meaning?.chinese || (question.mode === 'zh-to-en' ? question.prompt : '');
+
+    return `
+      <li class="wrong-review-item">
+        <strong>${escapeHtml(english)}</strong>
+        <span>
+          <em>${escapeHtml(PART_OF_SPEECH_LABELS[partOfSpeech] || 'other')}</em>
+          ${escapeHtml(chinese)}
+        </span>
+      </li>
+    `;
+  }).join('');
+
+  return `<ul class="wrong-review-list">${rows}</ul>`;
+}
+
+function renderWrongQuestionReview(quizState, words = []) {
+  if (!quizState.ended || quizState.reviewMode || quizState.wrongQuestions.length === 0 || quizState.wrongReviewCompleted) {
+    return '';
+  }
+
+  const showButton = quizState.wrongQuestionsVisible
+    ? ''
+    : '<button id="show-wrong-button" class="secondary-button" type="button">显示错题</button>';
+
   return `
     <section class="wrong-review-panel" aria-label="错题重做">
-      <span>本轮错题 ${quizState.wrongQuestions.length} 道</span>
-      <button id="redo-wrong-button" class="secondary-button" type="button">
-        <span aria-hidden="true">↻</span>
-        <span>重做错题</span>
-      </button>
+      <div class="wrong-review-summary">
+        <span>本轮错题 ${quizState.wrongQuestions.length} 道</span>
+        <div class="wrong-review-actions">
+          ${showButton}
+          <button id="redo-wrong-button" class="secondary-button" type="button">重做错题</button>
+        </div>
+      </div>
+      ${renderWrongQuestionRows(quizState, words)}
     </section>
   `;
 }
@@ -163,7 +202,7 @@ export function renderQuizPanel(quizState, feedback, options = {}) {
 
       ${renderCurrentQuestion(quizState, options.words)}
       ${renderFeedback(feedback)}
-      ${renderWrongQuestionReview(quizState)}
+      ${renderWrongQuestionReview(quizState, options.words)}
 
       <form id="answer-form" class="answer-form">
         <label>

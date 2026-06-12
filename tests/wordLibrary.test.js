@@ -42,6 +42,19 @@ test('filters word library by English and renders suggestions', () => {
   assert.doesNotMatch(html, /record/);
 });
 
+test('renders listen button before edit and delete actions', () => {
+  const html = renderWordLibrary(words, null, 'default', '');
+  const listenIndex = html.indexOf('data-word="apple"');
+  const editIndex = html.indexOf('edit-word-button');
+  const deleteIndex = html.indexOf('delete-word-button');
+
+  assert.ok(listenIndex > -1);
+  assert.ok(editIndex > -1);
+  assert.ok(deleteIndex > -1);
+  assert.ok(listenIndex < editIndex);
+  assert.ok(editIndex < deleteIndex);
+});
+
 test('filters English search by word prefix only', () => {
   const html = renderWordLibrary([
     {
@@ -84,6 +97,20 @@ test('shows only words with historical errors in frequent error mode', () => {
   const html = renderWordLibrary([
     ...words,
     {
+      id: 'word_skip',
+      english: 'skip',
+      meanings: [
+        {
+          id: 'meaning_skip',
+          partOfSpeech: 'verb',
+          chinese: '跳过',
+          spellingErrorCount: 0,
+          skipCount: 2,
+          errorCount: 0
+        }
+      ]
+    },
+    {
       id: 'word_clean',
       english: 'clean',
       meanings: [
@@ -93,11 +120,14 @@ test('shows only words with historical errors in frequent error mode', () => {
   ], null, 'frequent-errors');
 
   assert.match(html, /record/);
+  assert.match(html, /skip/);
   assert.match(html, /apple/);
   assert.match(html, /拼写错误 2 次 · 跳过 1 次/);
+  assert.match(html, /拼写错误 0 次 · 跳过 2 次/);
   assert.match(html, /拼写错误 1 次 · 跳过 0 次/);
   assert.doesNotMatch(html, /clean/);
   assert.ok(html.indexOf('record') < html.indexOf('apple'));
+  assert.ok(html.indexOf('skip') < html.indexOf('apple'));
 });
 
 test('shows an empty state when no word has historical errors', () => {

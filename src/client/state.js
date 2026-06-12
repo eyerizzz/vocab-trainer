@@ -8,6 +8,8 @@ export const initialQuizState = {
   started: false,
   ended: false,
   reviewMode: false,
+  wrongQuestionsVisible: false,
+  wrongReviewCompleted: false,
   seenWordIds: [],
   wrongQuestions: [],
   reviewQueue: [],
@@ -18,6 +20,8 @@ export const initialQuizState = {
 export function createQuizState() {
   return {
     ...initialQuizState,
+    wrongQuestionsVisible: false,
+    wrongReviewCompleted: false,
     seenWordIds: [],
     wrongQuestions: [],
     reviewQueue: []
@@ -31,6 +35,8 @@ export function resetQuizProgress(quizState) {
   quizState.started = false;
   quizState.ended = false;
   quizState.reviewMode = false;
+  quizState.wrongQuestionsVisible = false;
+  quizState.wrongReviewCompleted = false;
   quizState.seenWordIds = [];
   quizState.wrongQuestions = [];
   quizState.reviewQueue = [];
@@ -69,10 +75,28 @@ export function startWrongQuestionReview(quizState) {
   quizState.reviewMode = true;
   quizState.ended = false;
   quizState.started = true;
+  quizState.wrongQuestionsVisible = false;
+  quizState.wrongReviewCompleted = false;
   quizState.reviewQueue = quizState.wrongQuestions.map((item) => item.question);
   quizState.currentQuestion = null;
   quizState.currentWrongAttempts = 0;
   quizState.answeredCurrent = false;
+}
+
+export function showWrongQuestions(quizState) {
+  quizState.wrongQuestionsVisible = true;
+}
+
+export function finishWrongQuestionReview(quizState) {
+  quizState.currentQuestion = null;
+  quizState.currentWrongAttempts = 0;
+  quizState.answeredCurrent = false;
+  quizState.started = false;
+  quizState.ended = true;
+  quizState.reviewMode = false;
+  quizState.reviewQueue = [];
+  quizState.wrongQuestionsVisible = false;
+  quizState.wrongReviewCompleted = true;
 }
 
 export function recordAnswer(quizState, isCorrect) {

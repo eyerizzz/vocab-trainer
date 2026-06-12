@@ -25,7 +25,7 @@ async function prepareWordsFile(wordsFile) {
     return;
   }
 
-  const projectWordsFile = path.join(projectRoot, 'data', 'words.json');
+  const projectWordsFile = path.join(projectRoot, 'data', 'words.example.json');
 
   if (!await fileExists(projectWordsFile)) {
     return;

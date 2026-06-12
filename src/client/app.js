@@ -1,11 +1,13 @@
 import { api } from './api.js';
 import {
   createQuizState,
+  finishWrongQuestionReview,
   hasWrongQuestion,
   recordAnswer,
   recordSeenWord,
   recordWrongQuestion,
   resetQuizProgress,
+  showWrongQuestions,
   startWrongQuestionReview
 } from './state.js';
 import { renderQuizPanel } from './components/QuizPanel.js';
@@ -572,12 +574,7 @@ async function loadNextQuestion(successMessage) {
     const nextQuestion = state.quiz.reviewQueue.shift();
 
     if (!nextQuestion) {
-      state.quiz.currentQuestion = null;
-      state.quiz.currentWrongAttempts = 0;
-      state.quiz.answeredCurrent = false;
-      state.quiz.started = false;
-      state.quiz.ended = true;
-      state.quiz.reviewMode = false;
+      finishWrongQuestionReview(state.quiz);
       setFeedback('错题已重做完成', 'success');
       return;
     }
@@ -720,6 +717,7 @@ function finishQuiz() {
   state.quiz.answeredCurrent = false;
   state.quiz.reviewMode = false;
   state.quiz.reviewQueue = [];
+  state.quiz.wrongQuestionsVisible = false;
   setFeedback(null);
   render();
 }
@@ -731,6 +729,11 @@ async function redoWrongQuestions() {
 
   startWrongQuestionReview(state.quiz);
   await loadNextQuestion();
+  render();
+}
+
+function handleShowWrongQuestions() {
+  showWrongQuestions(state.quiz);
   render();
 }
 
@@ -836,6 +839,12 @@ function bindEvents() {
     playPronunciation(event.currentTarget.dataset.word, event.currentTarget);
     focusAnswerInput();
   });
+  document.querySelectorAll('.library-listen-button').forEach((button) => {
+    button.addEventListener('click', () => {
+      playPronunciation(button.dataset.word, button);
+    });
+  });
+  document.querySelector('#show-wrong-button')?.addEventListener('click', handleShowWrongQuestions);
   document.querySelector('#redo-wrong-button')?.addEventListener('click', redoWrongQuestions);
   document.querySelector('#reset-quiz-button')?.addEventListener('click', () => {
     resetQuizProgress(state.quiz);

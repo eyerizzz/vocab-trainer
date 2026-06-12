@@ -60,7 +60,11 @@ function getMeanings(word) {
 }
 
 function getMeaningWeight(meaning) {
-  const errorCount = Number(meaning.errorCount || 0);
+  const legacyErrorCount = Number(meaning.errorCount || 0);
+  const spellingErrorCount = Number(meaning.spellingErrorCount ?? legacyErrorCount);
+  const skipCount = Number(meaning.skipCount || 0);
+  const errorCount = (Number.isFinite(spellingErrorCount) ? spellingErrorCount : 0)
+    + (Number.isFinite(skipCount) ? skipCount : 0);
   return 1 + Math.min(Math.max(errorCount, 0), 10);
 }
 

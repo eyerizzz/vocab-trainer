@@ -2,12 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createQuizState,
+  finishWrongQuestionReview,
   getAccuracy,
   hasWrongQuestion,
   recordAnswer,
   recordSeenWord,
   recordWrongQuestion,
   resetQuizProgress,
+  showWrongQuestions,
   startWrongQuestionReview
 } from '../src/client/state.js';
 
@@ -40,7 +42,34 @@ test('records wrong questions once and starts review queue', () => {
   assert.equal(hasWrongQuestion(quizState, question), true);
   assert.equal(quizState.reviewMode, true);
   assert.equal(quizState.started, true);
+  assert.equal(quizState.wrongQuestionsVisible, false);
+  assert.equal(quizState.wrongReviewCompleted, false);
   assert.deepEqual(quizState.reviewQueue, [question]);
+});
+
+test('shows wrong questions and completes one wrong-question review', () => {
+  const quizState = createQuizState();
+  const question = {
+    wordId: 'word_1',
+    meaningId: 'meaning_1',
+    mode: 'zh-to-en',
+    prompt: '苹果'
+  };
+
+  recordWrongQuestion(quizState, { question, submittedAnswer: 'aple' });
+  showWrongQuestions(quizState);
+
+  assert.equal(quizState.wrongQuestionsVisible, true);
+
+  startWrongQuestionReview(quizState);
+  finishWrongQuestionReview(quizState);
+
+  assert.equal(quizState.started, false);
+  assert.equal(quizState.ended, true);
+  assert.equal(quizState.reviewMode, false);
+  assert.equal(quizState.wrongQuestionsVisible, false);
+  assert.equal(quizState.wrongReviewCompleted, true);
+  assert.deepEqual(quizState.reviewQueue, []);
 });
 
 test('records seen words once per round', () => {
@@ -76,6 +105,8 @@ test('resets quiz progress without changing selected controls', () => {
     answeredCurrent: true,
     started: true,
     seenWordIds: ['word_1'],
+    wrongQuestionsVisible: true,
+    wrongReviewCompleted: true,
     total: 4,
     correct: 3
   };
@@ -89,6 +120,8 @@ test('resets quiz progress without changing selected controls', () => {
   assert.equal(quizState.currentWrongAttempts, 0);
   assert.equal(quizState.answeredCurrent, false);
   assert.equal(quizState.started, false);
+  assert.equal(quizState.wrongQuestionsVisible, false);
+  assert.equal(quizState.wrongReviewCompleted, false);
   assert.deepEqual(quizState.seenWordIds, []);
   assert.equal(quizState.total, 0);
   assert.equal(quizState.correct, 0);

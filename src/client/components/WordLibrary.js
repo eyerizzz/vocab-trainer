@@ -19,13 +19,6 @@ function getMeanings(word) {
       }];
 }
 
-function getWordErrorCount(word) {
-  return getMeanings(word).reduce((total, meaning) => {
-    const errorCount = Number(meaning.errorCount || 0);
-    return total + (Number.isFinite(errorCount) ? Math.max(errorCount, 0) : 0);
-  }, 0);
-}
-
 function getWordErrorStats(word) {
   return getMeanings(word).reduce((stats, meaning) => {
     const legacyErrorCount = Number(meaning.errorCount || 0);
@@ -38,6 +31,11 @@ function getWordErrorStats(word) {
     stats.skipCount += Number.isFinite(skipCount) && skipCount > 0 ? Math.floor(skipCount) : 0;
     return stats;
   }, { spellingErrorCount: 0, skipCount: 0 });
+}
+
+function getWordErrorCount(word) {
+  const stats = getWordErrorStats(word);
+  return stats.spellingErrorCount + stats.skipCount;
 }
 
 function normalizeSearchQuery(value) {
@@ -166,6 +164,11 @@ function renderWordCard(word, editingWordId, options = {}) {
         <div class="meaning-badges">${renderMeaningBadges(word)}</div>
       </div>
       <div class="library-actions">
+        <button
+          class="ghost-button library-listen-button"
+          type="button"
+          data-word="${escapeHtml(word.english)}"
+        >听一下</button>
         <button class="ghost-button edit-word-button" type="button" data-word-id="${escapeHtml(word.id)}">编辑</button>
         <button class="ghost-button delete-word-button" type="button" data-word-id="${escapeHtml(word.id)}">删除</button>
       </div>

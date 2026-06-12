@@ -1,6 +1,6 @@
 # vocab-trainer
 
-一个本地运行的英语背单词工具。用户可以录入英文单词、中文释义和词性，也可以在输入英文后自动联网查词。数据保存在项目内的 `data/words.json`。
+一个本地运行的英语背单词工具。用户可以录入英文单词、中文释义和词性，也可以在输入英文后自动联网查词。个人词库保存在本地的 `data/words.json`，GitHub 只保留初始模板 `data/words.example.json`。
 
 ## 功能
 
@@ -16,7 +16,7 @@
 
 ## 数据结构
 
-`data/words.json` 使用一个英文单词对应多个释义的结构：
+`data/words.example.json` 是 GitHub 上的初始词库模板；本地运行时会使用 `data/words.json` 保存你的个人词库。词库使用一个英文单词对应多个释义的结构：
 
 ```json
 [
@@ -42,6 +42,14 @@
 ```
 
 ## 启动
+
+首次本地运行时，如果还没有个人词库，可以从模板复制一份：
+
+```bash
+cp data/words.example.json data/words.json
+```
+
+`data/words.json` 已加入 `.gitignore`，不会上传你的个人学习记录。
 
 ```bash
 node src/server/server.js
@@ -70,7 +78,7 @@ npm run desktop
 
 桌面版会自动启动本地服务并打开应用窗口，不需要手动访问 `localhost:3000`。
 
-桌面版的词库保存在系统应用数据目录，不再写入项目里的 `data/words.json`：
+桌面版的词库保存在系统应用数据目录，不再写入项目里的 `data/words.json`。首次启动时会从 `data/words.example.json` 初始化：
 
 - macOS: `~/Library/Application Support/Vocab Trainer/words.json`
 - Windows: `%APPDATA%/Vocab Trainer/words.json`
