@@ -328,19 +328,12 @@ function findExistingWord(english) {
 function applyQuizControlsFromForm() {
   const mode = document.querySelector('#quiz-mode')?.value || 'zh-to-en';
   const rangeSelection = document.querySelector('#quiz-range')?.value || 'all';
-  const daysInput = document.querySelector('#quiz-days');
   let range = rangeSelection;
   let days = state.quiz.days;
 
   if (rangeSelection === 'recent-7') {
     range = 'recent';
     days = 7;
-  } else if (rangeSelection === 'recent-30') {
-    range = 'recent';
-    days = 30;
-  } else if (rangeSelection === 'custom') {
-    range = 'recent';
-    days = Number(daysInput?.value || state.quiz.days);
   }
 
   const changed = state.quiz.mode !== mode || state.quiz.range !== range || state.quiz.days !== days;
@@ -542,12 +535,6 @@ async function handleNextQuestion() {
 
   applyQuizControlsFromForm();
 
-  if (state.quiz.range === 'recent' && (!Number.isInteger(state.quiz.days) || state.quiz.days <= 0)) {
-    setFeedback('自定义天数必须是正整数', 'error');
-    render();
-    return;
-  }
-
   try {
     let feedbackMessage = null;
 
@@ -570,12 +557,6 @@ async function handleNextQuestion() {
 
 async function handleQuizStart() {
   applyQuizControlsFromForm();
-
-  if (state.quiz.range === 'recent' && (!Number.isInteger(state.quiz.days) || state.quiz.days <= 0)) {
-    setFeedback('自定义天数必须是正整数', 'error');
-    render();
-    return;
-  }
 
   try {
     resetQuizProgress(state.quiz);
@@ -907,7 +888,6 @@ function bindEvents() {
   });
   document.querySelector('#quiz-mode')?.addEventListener('change', handleQuizControlChange);
   document.querySelector('#quiz-range')?.addEventListener('change', handleQuizControlChange);
-  document.querySelector('#quiz-days')?.addEventListener('change', handleQuizControlChange);
 }
 
 async function init() {

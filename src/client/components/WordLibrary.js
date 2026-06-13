@@ -49,11 +49,28 @@ function getDateFilterStart(dateFilter, now = new Date()) {
     return start;
   }
 
+  if (dateFilter === 'yesterday') {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 1);
+    return start;
+  }
+
   if (dateFilter === 'recent-7') {
     return new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   }
 
   return null;
+}
+
+function getDateFilterEnd(dateFilter, now = new Date()) {
+  if (dateFilter !== 'yesterday') {
+    return null;
+  }
+
+  const end = new Date(now);
+  end.setHours(0, 0, 0, 0);
+  return end;
 }
 
 function wordMatchesSearch(word, query) {
@@ -67,13 +84,16 @@ function wordMatchesSearch(word, query) {
 
 function wordMatchesDateFilter(word, dateFilter) {
   const start = getDateFilterStart(dateFilter);
+  const end = getDateFilterEnd(dateFilter);
 
   if (!start) {
     return true;
   }
 
   const createdAt = new Date(word.createdAt);
-  return Number.isFinite(createdAt.getTime()) && createdAt >= start;
+  return Number.isFinite(createdAt.getTime())
+    && createdAt >= start
+    && (!end || createdAt < end);
 }
 
 function filterWords(words, searchQuery, dateFilter) {
@@ -234,6 +254,7 @@ export function renderWordLibrary(words, editingWordId, sortMode = 'default', se
             <select id="library-date-filter">
               <option value="all" ${dateFilter === 'all' ? 'selected' : ''}>全部单词</option>
               <option value="today" ${dateFilter === 'today' ? 'selected' : ''}>今日添加</option>
+              <option value="yesterday" ${dateFilter === 'yesterday' ? 'selected' : ''}>昨天添加</option>
               <option value="recent-7" ${dateFilter === 'recent-7' ? 'selected' : ''}>近 7 日添加</option>
             </select>
           </label>

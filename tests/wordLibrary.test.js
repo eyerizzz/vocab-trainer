@@ -83,11 +83,29 @@ test('filters word library by added date', () => {
   assert.doesNotMatch(html, /ancient/);
 });
 
+test('filters word library by words added yesterday', () => {
+  const html = renderWordLibrary([
+    ...words,
+    {
+      id: 'word_yesterday',
+      english: 'drain',
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+      meanings: [
+        { id: 'meaning_yesterday', partOfSpeech: 'verb', chinese: '排水' }
+      ]
+    }
+  ], null, 'default', '', 'yesterday');
+
+  assert.match(html, /drain/);
+  assert.doesNotMatch(html, /apple/);
+  assert.doesNotMatch(html, /record/);
+});
+
 test('renders date filter options with selected value', () => {
-  const html = renderWordLibrary(words, null, 'default', '', 'today');
+  const html = renderWordLibrary(words, null, 'default', '', 'yesterday');
 
   assert.match(html, /id="library-date-filter"/);
-  assert.match(html, /value="today" selected>今日添加/);
+  assert.match(html, /value="yesterday" selected>昨天添加/);
 });
 
 test('filters English search by word prefix only', () => {

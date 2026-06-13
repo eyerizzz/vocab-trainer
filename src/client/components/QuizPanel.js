@@ -10,11 +10,7 @@ function getRangeSelection(quizState) {
     return 'recent-7';
   }
 
-  if (quizState.days === 30) {
-    return 'recent-30';
-  }
-
-  return 'custom';
+  return 'recent-7';
 }
 
 function renderFeedback(feedback) {
@@ -59,18 +55,37 @@ function getQuestionMeanings(question, words = []) {
   }
 
   return [{
-    partOfSpeech: question.partOfSpeech
+    partOfSpeech: question.partOfSpeech,
+    chinese: question.mode === 'zh-to-en' ? question.prompt : ''
   }];
 }
 
-function renderQuestionPartOfSpeeches(question, words = []) {
-  const labels = [...new Set(getQuestionMeanings(question, words)
-    .map((meaning) => PART_OF_SPEECH_LABELS[meaning.partOfSpeech] || 'other'))];
+function renderQuestionMeaningLines(question, words = []) {
+  return getQuestionMeanings(question, words).map((meaning) => `
+    <span class="question-meaning-line">
+      <strong>${escapeHtml(PART_OF_SPEECH_LABELS[meaning.partOfSpeech] || 'other')}</strong>
+      <span>${escapeHtml(meaning.chinese || '')}</span>
+    </span>
+  `).join('');
+}
+
+function renderQuestionPrompt(question, words = []) {
+  if (question.mode === 'zh-to-en') {
+    return `
+      <div class="question-meaning-list">
+        ${renderQuestionMeaningLines(question, words)}
+      </div>
+    `;
+  }
+
+  const meaning = getQuestionMeaning(question, words);
+  const label = PART_OF_SPEECH_LABELS[meaning?.partOfSpeech || question.partOfSpeech] || 'other';
 
   return `
-    <span class="question-pos-list" aria-label="词性">
-      ${labels.map((label) => `<span class="question-pos">${escapeHtml(label)}</span>`).join('')}
-    </span>
+    <p class="question-prompt">
+      <span class="question-pos">${escapeHtml(label)}</span>
+      <span>${escapeHtml(question.prompt)}</span>
+    </p>
   `;
 }
 
@@ -89,10 +104,7 @@ function renderCurrentQuestion(quizState, words = []) {
   const english = getQuestionEnglish(question, words);
   return `
     <div class="question-box">
-      <p class="question-prompt">
-        ${renderQuestionPartOfSpeeches(question, words)}
-        <span>${escapeHtml(question.prompt)}</span>
-      </p>
+      ${renderQuestionPrompt(question, words)}
       <button
         id="listen-word-button"
         class="listen-button"
@@ -154,7 +166,6 @@ function renderWrongQuestionReview(quizState, words = []) {
 
 export function renderQuizPanel(quizState, feedback, options = {}) {
   const rangeSelection = getRangeSelection(quizState);
-  const customHidden = rangeSelection === 'custom' ? '' : 'hidden';
   const submitDisabled = quizState.currentQuestion && !quizState.answeredCurrent ? '' : 'disabled';
   const startDisabled = quizState.started ? 'disabled' : '';
   const nextDisabled = quizState.started ? '' : 'disabled';
@@ -201,15 +212,9 @@ export function renderQuizPanel(quizState, feedback, options = {}) {
           <select id="quiz-range">
             <option value="all" ${rangeSelection === 'all' ? 'selected' : ''}>全部</option>
             <option value="today" ${rangeSelection === 'today' ? 'selected' : ''}>今天</option>
+            <option value="yesterday" ${rangeSelection === 'yesterday' ? 'selected' : ''}>昨天</option>
             <option value="recent-7" ${rangeSelection === 'recent-7' ? 'selected' : ''}>近 7 天</option>
-            <option value="recent-30" ${rangeSelection === 'recent-30' ? 'selected' : ''}>近 30 天</option>
-            <option value="custom" ${rangeSelection === 'custom' ? 'selected' : ''}>自定义</option>
           </select>
-        </label>
-
-        <label id="custom-days-field" class="${customHidden}">
-          <span>最近天数</span>
-          <input id="quiz-days" type="number" min="1" step="1" value="${quizState.days}" />
         </label>
       </div>
 

@@ -23,7 +23,7 @@ test('renders library button before add-word button in quiz header', () => {
   assert.ok(html.indexOf('id="quiz-library-button"') < html.indexOf('id="add-word-button"'));
 });
 
-test('renders all part-of-speech labels for a multi-meaning quiz word', () => {
+test('renders each part of speech and meaning on separate quiz lines', () => {
   const quizState = {
     ...createQuizState(),
     currentQuestion: {
@@ -46,7 +46,24 @@ test('renders all part-of-speech labels for a multi-meaning quiz word', () => {
   });
 
   assert.match(html, /n\./);
+  assert.match(html, /记录/);
   assert.match(html, /v\./);
+  assert.match(html, /录制/);
+  assert.equal((html.match(/question-meaning-line/g) || []).length, 2);
+});
+
+test('renders yesterday as a quiz range option', () => {
+  const html = renderQuizPanel({ ...createQuizState(), range: 'yesterday' }, null, { words });
+
+  assert.match(html, /value="yesterday" selected>昨天/);
+});
+
+test('does not render removed quiz range options', () => {
+  const html = renderQuizPanel(createQuizState(), null, { words });
+
+  assert.doesNotMatch(html, /近 30 天/);
+  assert.doesNotMatch(html, /自定义/);
+  assert.doesNotMatch(html, /quiz-days/);
 });
 
 test('renders wrong-question choices before revealing wrong words', () => {

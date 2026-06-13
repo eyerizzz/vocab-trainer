@@ -28,6 +28,14 @@ const words = [
     createdAt: '2026-06-01T10:00:00.000Z'
   },
   {
+    id: 'word_yesterday',
+    english: 'drain',
+    meanings: [
+      { id: 'meaning_yesterday_verb', chinese: '排水', partOfSpeech: 'verb' }
+    ],
+    createdAt: '2026-06-02T12:00:00.000Z'
+  },
+  {
     id: 'word_today',
     english: 'run',
     meanings: [
@@ -47,13 +55,16 @@ const words = [
 ];
 
 test('filters words by all, today, and recent ranges', () => {
-  assert.equal(filterWordsByRange(words, { range: 'all' }, fixedNow).length, 4);
+  assert.equal(filterWordsByRange(words, { range: 'all' }, fixedNow).length, 5);
 
   const today = filterWordsByRange(words, { range: 'today' }, fixedNow);
   assert.deepEqual(today.map((word) => word.id), ['word_today']);
 
+  const yesterday = filterWordsByRange(words, { range: 'yesterday' }, fixedNow);
+  assert.deepEqual(yesterday.map((word) => word.id), ['word_yesterday']);
+
   const recentSeven = filterWordsByRange(words, { range: 'recent', days: 7 }, fixedNow);
-  assert.deepEqual(recentSeven.map((word) => word.id), ['word_week', 'word_today']);
+  assert.deepEqual(recentSeven.map((word) => word.id), ['word_week', 'word_yesterday', 'word_today']);
 });
 
 test('includes words created exactly at the selected range start', () => {
@@ -93,7 +104,7 @@ test('keeps random selection inside the available pool', () => {
 
   assert.equal(first.question.wordId, 'word_old');
   assert.equal(last.question.wordId, 'word_bad_date');
-  assert.equal(last.poolSize, 4);
+  assert.equal(last.poolSize, 5);
 });
 
 test('can shuffle candidates before picking a random question', () => {
@@ -117,7 +128,7 @@ test('excludes words already seen in the current round', () => {
   );
 
   assert.equal(result.empty, false);
-  assert.equal(result.question.wordId, 'word_today');
+  assert.equal(result.question.wordId, 'word_yesterday');
 });
 
 test('returns exhausted state when all words in range were seen', () => {
@@ -209,7 +220,7 @@ test('trims word id and returns the checked word details', () => {
   });
 
   assert.equal(result.correct, true);
-  assert.deepEqual(result.word, words[2]);
+  assert.deepEqual(result.word, words[3]);
   assert.equal(result.meaning.id, 'meaning_today_verb');
 });
 

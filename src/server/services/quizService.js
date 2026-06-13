@@ -1,5 +1,5 @@
 export const QUIZ_MODES = ['en-to-zh', 'zh-to-en'];
-export const QUIZ_RANGES = ['all', 'today', 'recent'];
+export const QUIZ_RANGES = ['all', 'today', 'yesterday', 'recent'];
 
 const modeSet = new Set(QUIZ_MODES);
 const rangeSet = new Set(QUIZ_RANGES);
@@ -115,12 +115,32 @@ export function getRangeStart(range = 'all', days, now = new Date()) {
     return start;
   }
 
+  if (range === 'yesterday') {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - 1);
+    return start;
+  }
+
   return new Date(now.getTime() - parsePositiveInteger(days) * oneDayMs);
+}
+
+export function getRangeEnd(range = 'all', now = new Date()) {
+  assertRange(range);
+
+  if (range !== 'yesterday') {
+    return null;
+  }
+
+  const end = new Date(now);
+  end.setHours(0, 0, 0, 0);
+  return end;
 }
 
 export function filterWordsByRange(words, options = {}, now = new Date()) {
   const range = options.range || 'all';
   const start = getRangeStart(range, options.days, now);
+  const end = getRangeEnd(range, now);
 
   if (!start) {
     return words;
@@ -128,7 +148,9 @@ export function filterWordsByRange(words, options = {}, now = new Date()) {
 
   return words.filter((word) => {
     const createdAt = new Date(word.createdAt);
-    return Number.isFinite(createdAt.getTime()) && createdAt >= start;
+    return Number.isFinite(createdAt.getTime())
+      && createdAt >= start
+      && (!end || createdAt < end);
   });
 }
 
