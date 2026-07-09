@@ -33,3 +33,14 @@ test('renders multiple selected parts of speech', () => {
   assert.match(html, /value="verb" checked/);
   assert.doesNotMatch(html, /value="noun" checked/);
 });
+
+test('renders English word input with Latin keyboard hints and no autocapitalization', () => {
+  const html = renderWordForm();
+
+  assert.match(html, /name="english"/);
+  assert.match(html, /autocapitalize="none"/);
+  assert.match(html, /autocorrect="off"/);
+  assert.match(html, /spellcheck="false"/);
+  assert.match(html, /inputmode="latin"/);
+  assert.match(html, /lang="en"/);
+});

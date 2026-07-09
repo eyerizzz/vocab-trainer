@@ -13,6 +13,7 @@ import {
 import { renderQuizPanel } from './components/QuizPanel.js';
 import { PART_OF_SPEECH_LABELS, renderWordForm } from './components/WordForm.js';
 import { renderWordLibrary } from './components/WordLibrary.js';
+import { shouldSubmitWordFormOnEnter } from './formShortcuts.js';
 
 const app = document.querySelector('#app');
 
@@ -45,9 +46,7 @@ let lookupTimer = null;
 let lookupRequestId = 0;
 let noticeTimer = null;
 let noticeId = 0;
-let pronunciationAudio = null;
 const lookupDelayMs = 1100;
-const pronunciationFallbackDelayMs = 1400;
 
 function getCandidateKey(candidate) {
   return `${candidate.partOfSpeech}|${candidate.chinese}`;
@@ -228,7 +227,7 @@ function speakWithBrowserVoice(english) {
   if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
     setFeedback('暂时无法播放发音', 'warning');
     render();
-    return;
+    return false;
   }
 
   window.speechSynthesis.cancel();
@@ -236,6 +235,7 @@ function speakWithBrowserVoice(english) {
   utterance.lang = 'en-US';
   utterance.rate = 0.9;
   window.speechSynthesis.speak(utterance);
+  return true;
 }
 
 function showListenButtonResponse(button, label = '播放中') {
@@ -258,7 +258,6 @@ function showListenButtonResponse(button, label = '播放中') {
 
 function playPronunciation(word, button) {
   const english = String(word || '').trim();
-  showListenButtonResponse(button);
 
   if (!english) {
     setFeedback('当前题目没有可播放的英文单词', 'warning');
@@ -266,37 +265,8 @@ function playPronunciation(word, button) {
     return;
   }
 
-  let didFallback = false;
-  let fallbackTimer = null;
-  const fallback = () => {
-    if (didFallback) {
-      return;
-    }
-
-    didFallback = true;
-    clearTimeout(fallbackTimer);
-    pronunciationAudio?.pause();
+  if (speakWithBrowserVoice(english)) {
     showListenButtonResponse(button, '已朗读');
-    speakWithBrowserVoice(english);
-  };
-
-  try {
-    pronunciationAudio?.pause();
-    pronunciationAudio = new Audio(
-      `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(english)}&type=2`
-    );
-    pronunciationAudio.addEventListener('error', fallback, { once: true });
-    pronunciationAudio.addEventListener('playing', () => {
-      clearTimeout(fallbackTimer);
-    }, { once: true });
-    const playResult = pronunciationAudio.play();
-    fallbackTimer = window.setTimeout(fallback, pronunciationFallbackDelayMs);
-
-    if (playResult?.catch) {
-      playResult.catch(fallback);
-    }
-  } catch {
-    fallback();
   }
 }
 
@@ -495,6 +465,15 @@ function handleWordFormInput(event) {
   if (previousEnglish !== nextEnglish) {
     scheduleWordLookup(nextEnglish);
   }
+}
+
+function handleWordFormKeydown(event) {
+  if (!shouldSubmitWordFormOnEnter(event)) {
+    return;
+  }
+
+  event.preventDefault();
+  event.currentTarget.requestSubmit();
 }
 
 function handleLookupCandidateChange(event) {
@@ -833,6 +812,7 @@ function bindEvents() {
   const wordForm = document.querySelector('#word-form');
 
   wordForm?.addEventListener('submit', handleWordSubmit);
+  wordForm?.addEventListener('keydown', handleWordFormKeydown);
   wordForm?.addEventListener('input', handleWordFormInput);
   wordForm?.addEventListener('change', (event) => {
     updateWordFormDraft(wordForm);

@@ -58,6 +58,17 @@ test('renders listen button before edit and delete actions', () => {
   assert.ok(editIndex < deleteIndex);
 });
 
+test('renders editable English word input with Latin keyboard hints', () => {
+  const html = renderWordLibrary(words, 'word_apple', 'default', '');
+
+  assert.match(html, /name="english"/);
+  assert.match(html, /autocapitalize="none"/);
+  assert.match(html, /autocorrect="off"/);
+  assert.match(html, /spellcheck="false"/);
+  assert.match(html, /inputmode="latin"/);
+  assert.match(html, /lang="en"/);
+});
+
 test('renders phonetic next to the English word', () => {
   const html = renderWordLibrary(words, null, 'default', '');
 

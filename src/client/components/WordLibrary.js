@@ -1,4 +1,8 @@
-import { PART_OF_SPEECH_LABELS, renderPartOfSpeechOptions } from './WordForm.js';
+import {
+  ENGLISH_WORD_INPUT_ATTRIBUTES,
+  PART_OF_SPEECH_LABELS,
+  renderPartOfSpeechOptions
+} from './WordForm.js';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -188,7 +192,7 @@ function renderWordCard(word, editingWordId, options = {}) {
         <form class="word-edit-form" data-word-id="${escapeHtml(word.id)}">
           <label>
             <span>英文单词</span>
-            <input name="english" value="${escapeHtml(word.english)}" required />
+            <input name="english" ${ENGLISH_WORD_INPUT_ATTRIBUTES} value="${escapeHtml(word.english)}" required />
           </label>
           <div class="meaning-edit-list">
             ${renderMeaningEditRows(word)}

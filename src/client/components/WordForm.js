@@ -7,6 +7,15 @@ export const PART_OF_SPEECH_LABELS = {
   other: 'other'
 };
 
+export const ENGLISH_WORD_INPUT_ATTRIBUTES = [
+  'autocomplete="off"',
+  'autocapitalize="none"',
+  'autocorrect="off"',
+  'spellcheck="false"',
+  'inputmode="latin"',
+  'lang="en"'
+].join(' ');
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll('&', '&amp;')
@@ -115,7 +124,7 @@ export function renderWordForm(form = {}, lookup = { status: 'idle', candidates:
       <form id="word-form" class="word-form">
         <label>
           <span>英文单词</span>
-          <input name="english" autocomplete="off" placeholder="example" value="${english}" required />
+          <input name="english" ${ENGLISH_WORD_INPUT_ATTRIBUTES} placeholder="example" value="${english}" required />
         </label>
 
         ${renderLookupArea(lookup)}
