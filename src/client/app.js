@@ -46,6 +46,7 @@ let lookupTimer = null;
 let lookupRequestId = 0;
 let noticeTimer = null;
 let noticeId = 0;
+let pronunciationAudio = null;
 const lookupDelayMs = 1100;
 
 function getCandidateKey(candidate) {
@@ -223,19 +224,8 @@ function focusWordInput(options = {}) {
   }
 }
 
-function speakWithBrowserVoice(english) {
-  if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
-    setFeedback('暂时无法播放发音', 'warning');
-    render();
-    return false;
-  }
-
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(english);
-  utterance.lang = 'en-US';
-  utterance.rate = 0.9;
-  window.speechSynthesis.speak(utterance);
-  return true;
+function getPronunciationAudioUrl(english) {
+  return `https://dict.youdao.com/dictvoice?audio=${encodeURIComponent(english)}&type=2`;
 }
 
 function showListenButtonResponse(button, label = '播放中') {
@@ -265,8 +255,31 @@ function playPronunciation(word, button) {
     return;
   }
 
-  if (speakWithBrowserVoice(english)) {
-    showListenButtonResponse(button, '已朗读');
+  try {
+    pronunciationAudio?.pause();
+    pronunciationAudio = new Audio(getPronunciationAudioUrl(english));
+    pronunciationAudio.addEventListener('playing', () => {
+      showListenButtonResponse(button, '播放中');
+    }, { once: true });
+    pronunciationAudio.addEventListener('ended', () => {
+      showListenButtonResponse(button, '已播放');
+    }, { once: true });
+    pronunciationAudio.addEventListener('error', () => {
+      setFeedback('暂时无法播放发音', 'warning');
+      render();
+    }, { once: true });
+
+    const playResult = pronunciationAudio.play();
+
+    if (playResult?.catch) {
+      playResult.catch(() => {
+        setFeedback('暂时无法播放发音', 'warning');
+        render();
+      });
+    }
+  } catch {
+    setFeedback('暂时无法播放发音', 'warning');
+    render();
   }
 }
 
