@@ -99,7 +99,7 @@ test('records seen words once per round', () => {
   assert.deepEqual(quizState.seenWordIds, ['word_1', 'word_2']);
 });
 
-test('records correct and incorrect answers for accuracy', () => {
+test('records completed question outcomes for accuracy', () => {
   const quizState = createQuizState();
 
   recordAnswer(quizState, true);

@@ -4,7 +4,7 @@ export function renderStatsPanel(quizState) {
   return `
     <section class="stats-grid" aria-label="本次测试统计">
       <div class="stat-tile">
-        <span>答题数</span>
+        <span>已测试单词</span>
         <strong>${quizState.total}</strong>
       </div>
       <div class="stat-tile">

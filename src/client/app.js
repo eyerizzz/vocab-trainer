@@ -651,9 +651,8 @@ async function handleAnswerSubmit(event) {
       answer
     });
 
-    recordAnswer(state.quiz, result.correct);
-
     if (result.correct) {
+      recordAnswer(state.quiz, true);
       state.quiz.answeredCurrent = true;
       state.quiz.currentWrongAttempts = 0;
       await loadNextQuestion();
@@ -661,6 +660,7 @@ async function handleAnswerSubmit(event) {
       state.quiz.currentWrongAttempts += 1;
 
       if (state.quiz.currentWrongAttempts >= 2) {
+        recordAnswer(state.quiz, false);
         state.quiz.answeredCurrent = true;
         await addCurrentQuestionToWrongSet({
           submittedAnswer: String(answer || '').trim(),
